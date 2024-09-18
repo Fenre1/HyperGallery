@@ -134,6 +134,8 @@ class Application(Frame,object):
         self.czcurrent = 0
         self.ctrlzused = 0
         self.meta_data = pd.DataFrame() # DataFrame to hold metadata
+        self.selected_edge = None # Currently selected hyperedge
+        self.hyperedge_canvases = [] # to store our hyperedge canvases of the second window
         #currently available:
             #'resnet18'
             #'resnet152' << prefered option
@@ -322,6 +324,12 @@ class Application(Frame,object):
             self.communication_label.configure(text='')
             self.communication_label.configure(text='Sort the metadata in the table (e.g., by DateTimeOriginal). Select a row in the table to display images from that point onward.')
         
+        #button to load
+        self.lb = Button(background='#445544',foreground='white',width='20',relief='solid',bd=1)
+        self.lb['text'] ="Load session"
+        self.lb['command'] = lambda:[self.load_as(),self.display_hyperedges()]
+        self.lb.bind('<Button-3>',load_text)
+        self.lb.place(x=200,y=20)
 
 
                
@@ -341,14 +349,27 @@ class Application(Frame,object):
         self.inbucket.var = ww
         self.inbucket.place(x=400,y=240)
 
+        #enter number of images shown
+        self.e1 = Entry(background='#777777',foreground = 'white',exportselection=0,width=24)
+        self.e1.insert(END, 800) #800 is default, change if needed. 
+        self.e1.bind('<Button-3>',numim_text)        
+        self.e1.place(x=200,y=250)
+        self.var = IntVar()
+        self.var.set(0)
 
+        #button to show currently selected bucket
+        self.b4 = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.b4['text'] ="Show hyperedge"
+        self.b4.bind('<Button-3>',showbucket_text)        
+        self.b4['command'] = self.showEdge
+        self.b4.place(x=400,y=120)
 
 
         ### some other stuff ####
         #creates window for statistics and other data
         self.newWindow = Toplevel(self.master)
         self.newWindow.geometry("1400x500")
-        self.newWindow.title("Buckets")
+        self.newWindow.title("Hyperedges")
         self.newWindow.configure(background='#555555')
         #create dataframe for the bucket
         self.theBuckets = {}
@@ -445,163 +466,7 @@ class Application(Frame,object):
         self.origX = self.c.xview()[0]
         self.origY = self.c.yview()[0]
 
-        #progressbar. Doesnt work yet
-        self.progress = ttk.Progressbar(self, orient='horizontal', length = 200, mode='determinate')
-        self.progress.place(x=10,y=10)
-    
         
-        # second window stuff
-        
-        self.progress_label = ttk.Label(self.newWindow)
-        self.progress_label['text'] = 'Progress'
-        self.progress_label.place(x=125,y=280)
-        
-        #button to show filtered buckets
-        self.filter_button = ttk.Button(self.newWindow)
-        self.filter_button['text'] ="Show filtered buckets"
-        self.filter_button['command'] = self.filter_buckets
-        self.filter_button.bind('<Button-3>',filter_text)        
-        self.filter_button.place(x=125,y=220)
-        self.filter_button['width'] = 30
-
-        #button to clear filters
-        self.filterclear_button = ttk.Button(self.newWindow)
-        self.filterclear_button['text'] ="Clear"
-        self.filterclear_button['command'] = self.clear_filter
-        self.filterclear_button.bind('<Button-3>',filter_text)        
-        self.filterclear_button.place(x=325,y=220)
-        self.filterclear_button['width'] = 10
-        
-        # self.sankey_button = ttk.Button(self.newWindow)
-        # self.sankey_button['text'] ="Create sankey diagram"
-        # self.sankey_button['command'] = self.create_sankey
-        # self.sankey_button.bind('<Button-3>',sankey_text)        
-        # self.sankey_button.place(x=125,y=250)
-        # self.sankey_button['width'] = 30
-
-        # self.tsne_button = ttk.Button(self.newWindow)
-        # self.tsne_button['text'] ="Create tsne graph"
-        # self.tsne_button['command'] = self.create_tsne
-        # self.tsne_button.bind('<Button-3>',sankey_text)        
-        # self.tsne_button.place(x=400,y=250)
-        # self.tsne_button['width'] = 30
-
-        self.umap_button = ttk.Button(self.newWindow)
-        self.umap_button['text'] ="Create umap graph"
-        self.umap_button['command'] = self.create_tsne
-        self.umap_button.bind('<Button-3>',sankey_text)        
-        self.umap_button.place(x=400,y=270)
-        self.umap_button['width'] = 30
-        
-        self.reumap_button = ttk.Button(self.newWindow)
-        self.reumap_button['text'] ="Recreate umap graph"
-        self.reumap_button['command'] = self.recreate_tsne
-        self.reumap_button.bind('<Button-3>',sankey_text)        
-        self.reumap_button.place(x=400,y=300)
-        self.reumap_button['width'] = 30
-
-        self.graph_button = ttk.Button(self.newWindow)
-        self.graph_button['text'] ="Create graph"
-        #self.graph_button['command'] = self.creategraph
-        self.graph_button.bind('<Button-3>',sankey_text)        
-        self.graph_button.place(x=125,y=280)
-        self.graph_button['width'] = 30
-
-        
-        self.filter_in_label = ttk.Label(self.newWindow)
-        self.filter_in_label['text'] = 'Show images only in:'
-        self.filter_in_label.place(x=20,y=20)
-
-        self.filter_out_label = ttk.Label(self.newWindow)
-        self.filter_out_label['text'] = 'Show images NOT in:'
-        self.filter_out_label.place(x=250,y=20)
-
-        
-        
-        boxscrollbar2 = Scrollbar(self.newWindow,width = 10)
-        #listbox containing the names of the buckets
-        self.categories2 = Listbox(self.newWindow,width=30,background='#777777',foreground='white',yscrollcommand=boxscrollbar2.set,exportselection=1)
-        self.catList = self.categories.get(0,END)
-        # self.categories2['listvariable'] = self.catList
-        for k in range(0,len(self.catList)):
-            self.categories2.insert(END,self.catList[k])
-        self.categories2['selectmode'] = 'extended'               
-        self.categories2.place(x=20,y=50)    
-        #place of the scrollbar
-        boxscrollbar2.config(command=self.categories2.yview)
-        boxscrollbar2.place(in_=self.categories2,relx=1.0, relheight=1)
-#
-        boxscrollbar3 = Scrollbar(self.newWindow,width = 10)
-        #listbox containing the names of the buckets
-        self.categories3 = Listbox(self.newWindow,width=30,background='#777777',foreground='white',yscrollcommand=boxscrollbar3.set,exportselection=0)
-        self.catList = self.categories.get(0,END)
-        # self.categories3['listvariable'] = self.catList
-        for k in range(0,len(self.catList)):
-            self.categories3.insert(END,self.catList[k])
-        self.categories3['selectmode'] = 'extended'               
-        self.categories3.place(x=250,y=50)    
-        #place of the scrollbar
-        boxscrollbar3.config(command=self.categories3.yview)
-        boxscrollbar3.place(in_=self.categories3,relx=1.0, relheight=1)
-
-
-        ### metadata buttons    
-        self.metadata_listbox = Listbox(self.newWindow, selectmode='multiple',width=30,background='#777777',foreground='white',yscrollcommand=boxscrollbar2.set,exportselection=1)
-        self.metadata_listbox.place(x=20,y=370)
-
-        self.metadata_selection_listbox = Listbox(self.newWindow, selectmode='multiple',width=30,background='#777777',foreground='white',yscrollcommand=boxscrollbar2.set,exportselection=1)
-        self.metadata_selection_listbox.place(x=250,y=370)        
-
-        #button to acquire metadata from images
-        self.metabutton1 = Button(self.newWindow,background='#884444',foreground='white',width='25',relief='solid',bd=1)
-        self.metabutton1['text'] ="Get metadata"
-        self.metabutton1.bind('<Button-3>',get_metadata_text)        
-        self.metabutton1['command'] = self.get_metadata
-        self.metabutton1.place(x=20,y=570)        
-
-        #button to display metadata from images
-        self.metabutton2 = Button(self.newWindow,background='#884444',foreground='white',width='25',relief='solid',bd=1)
-        self.metabutton2['text'] ="Display metadata"
-        self.metabutton2.bind('<Button-3>',display_metadata__text)        
-        self.metabutton2['command'] = self.display_selected_metadata
-        self.metabutton2.place(x=250,y=540)        
-
-        self.metasearch_var = StringVar()
-        self.metasearch_var.trace_add("write", self.update_the_metalist)
-        
-        self.metafilter_entry = Entry(self.newWindow,background='#777777',foreground = 'white', textvariable=self.metasearch_var, width=30)
-        self.metafilter_entry.place(x=20,y=350)
-        self.metafilter_cats_label = Label(self.newWindow,width=25,background='#555555',foreground='white',relief='flat',justify=LEFT, anchor='w')
-        self.metafilter_cats_label['text'] = 'Select metadata'
-        self.metafilter_cats_label.place(x=20,y=310)
-
-
-        self.meta_addbutton1 = Button(self.newWindow,background='#884444',foreground='white',width='5',relief='solid',bd=1)
-        self.meta_addbutton1['text'] ="Add >"
-        self.meta_addbutton1.bind('<Button-3>',add_metadata_text)        
-        self.meta_addbutton1['command'] = self.add_selected_metadata
-        self.meta_addbutton1.place(x=205,y=450)        
-
-        self.metabutton3 = Button(self.newWindow,background='#884444',foreground='white',width='25',relief='solid',bd=1)
-        self.metabutton3['text'] ="Display ordered images"
-        self.metabutton3.bind('<Button-3>',display_metaimages_text)        
-        self.metabutton3['command'] = self.show_images_by_metadata
-        self.metabutton3.place(x=250,y=570)        
-
-        
-        def in_filter(event):
-            # Note here that Tkinter passes an event object to onselect()
-            self.filter_in = self.categories2.curselection()
-        self.categories2.bind('<<ListboxSelect>>', in_filter)
-
-        def out_filter(event):
-            # Note here that Tkinter passes an event object to onselect()
-            self.filter_out = self.categories3.curselection()
-        self.categories3.bind('<<ListboxSelect>>', out_filter)
-        
-
-                        
-
         
         
        
@@ -657,10 +522,17 @@ class Application(Frame,object):
                 self.selectedcat = []        
         
     def _bound_to_mousewheel(self,event):
-            self.c.bind_all("<MouseWheel>", self._on_mousewheel)
+        print(event)            
+        self.c.bind_all("<MouseWheel>", self._on_mousewheel)
             
     def _unbound_to_mousewheel(self, event):
-            self.c.unbind_all("<MouseWheel>") 
+        self.c.unbind_all("<MouseWheel>") 
+
+    def _bound_to_mousewheel_second_window(self,event):
+        event.widget.bind_all("<MouseWheel>", self._on_mousewheel_second_window)
+            
+    def _unbound_to_mousewheel_second_window(self, event):
+        event.widget.unbind_all("<MouseWheel>")
 
     def update_the_list(self,*args):
         search_term = self.search_var.get()
@@ -786,7 +658,6 @@ class Application(Frame,object):
         try:
             self.seenX = np.max(self.totimseen)
             self.totimseen = []
-            # print('total X',self.seenX)
         except AttributeError:
             pass
         except ValueError:
@@ -795,17 +666,16 @@ class Application(Frame,object):
             else:
                 self.seenX = len(self.ccluster)
                 
-            # print('total X',self.seenX)
         if len(cluster) == 0:
             self.communication_label.configure(text='No images to show')
             return
         self.ccluster = cluster
         if input_origin == 'overview':
             self.oview = 1
-            self.bO3["state"] = 'normal'
+            # self.bO3["state"] = 'normal'
         else:
             self.oview = 0
-            self.bO3["state"] = 'disabled'
+            # self.bO3["state"] = 'disabled'
        
         self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance)) #the total number of images that fit from left to right
 
@@ -861,24 +731,7 @@ class Application(Frame,object):
 
                 #load = Image.open(x[j])
                 #test = np.asarray(hdf.get('thumbnails')[1],dtype='uint8')
-                load = Image.fromarray(np.array(hdf.get('thumbnails')[self.ccluster[j]],dtype='uint8'))
-                # try:
-                #     for orientation in ExifTags.TAGS.keys():
-                #         if ExifTags.TAGS[orientation]=='Orientation':
-                #             break
-                #     exif=dict(load._getexif().items())
-                
-                #     if exif[orientation] == 3:
-                #         load=load.rotate(180, expand=True)
-                #     elif exif[orientation] == 6:
-                #         load=load.rotate(270, expand=True)
-                #     elif exif[orientation] == 8:
-                #         load=load.rotate(90, expand=True)
-                # except AttributeError:
-                #     pass
-                # except KeyError:
-                #     pass
-                # load = load.resize((self.imsize,self.imsize))
+                load = Image.fromarray(np.array(hdf.get('thumbnail_images')[self.ccluster[j]],dtype='uint8'))
                 render = ImageTk.PhotoImage(load)
                 self.my_img.append([])
                 self.my_img[j] = Label(self.c,background='#555555')
@@ -930,7 +783,10 @@ class Application(Frame,object):
             self.totimseen.append(num_above+num_below)
          
         
-
+    def _on_mousewheel_second_window(self, event):
+        # Windows only
+        print("Mouse wheel event in second window")  # For debugging
+        event.widget.yview_scroll(int(-1*(event.delta/120)), "units")
         
         
     #function to update the image size if the user changes it
@@ -1714,51 +1570,40 @@ class Application(Frame,object):
         self.display_images(expanded_cluster)
 
     # function to display the contents of the selected bucket 
-    def showBucket(self):
+    def showEdge(self):
 #        with open('D:\\PhD\\Visual Analytics\\MockCase\\zForBucket.pickle', 'wb') as handle:
-#            pickle.dump(self.theBuckets,handle,protocol=pickle.HIGHEST_PROTOCOL)
-        self.bucketDisp = 1
+#            pickle.dump(self.theBuckets,handle,protocol=pickle.HIGHEST_PROTOCOL)        
         self.c.delete("all")
-        selected = self.categories.curselection() #acquire the selected category
-        if len(selected) == 1:
-            self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'show bucket ' + self.categories.get(selected))
-            self.BucketSel = selected
-            self.cluster = self.theBuckets[self.categories.get(selected)]
-            self.cluster = np.asarray(self.cluster)
-            self.cluster = self.cluster[np.nonzero(self.cluster)]
-            self.current_bucket = self.cluster
-            num_im = len(self.cluster)
-            self.communication_label.configure(text='The bucket '+ self.categories.get(selected) +' is shown. This bucket contains ' + str(num_im) + ' images.')
-
-#            with open('D:\\PhD\\Visual Analytics\\MockCase\\zForBucket.pickle', 'wb') as handle:
-#                pickle.dump(self.cluster,handle,protocol=pickle.HIGHEST_PROTOCOL)
-
-        if len(selected) > 1:
-            self.cluster = []
-            bucket_com = ''
-            for i in range(0,len(selected)):
-                self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'show the following buckets ' + self.categories.get(selected[i]))
-                self.cluster.append(self.theBuckets[self.categories.get(selected[i])])
-                bucket_com = bucket_com + self.categories.get(selected[i]) + '|' 
-#            tempC = self.cluster[0]
-
-#            for i in range(1,len(selected)):
-#                tempC = set(tempC) & set(self.cluster[i])
-                
-#            tempC = list(tempC)
-#            self.cluster = np.zeros((len(tempC),1))    
-#            for i in range(0,len(tempC)):
-#                self.cluster[i,0] = tempC[i]
-            self.cluster = list(chain.from_iterable(self.cluster)) 
-            self.cluster = list(set(self.cluster))
-            #self.cluster = self.cluster[np.nonzero(self.cluster)]
-            self.current_bucket = self.cluster
-            num_im = len(self.cluster)
-            self.communication_label.configure(text='The following buckets are shown: '+ bucket_com +'. These buckets contain a total of ' + str(num_im) + ' images.')
+        self.selected_edge = self.categories.get(self.categories.curselection()) #acquire the selected category
+        if len(self.selected_edge) == 1:
+            # self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'show bucket ' + self.categories.get(selected))
+            # self.BucketSel = selected
+            # self.cluster = self.theBuckets[self.categories.get(selected)]
+            # self.cluster = np.asarray(self.cluster)
+            # self.cluster = self.cluster[np.nonzero(self.cluster)]
+            # self.current_bucket = self.cluster
             
-        self.imagex = []
-        self.cluster = np.asarray(self.cluster)
-        self.display_images(self.cluster)
+            self.communication_label.configure(text='The hyperedge '+ self.categories.get(self.selected_edge) +' is shown.')
+
+
+        # if len(self.selected_edge) > 1:
+        #     self.cluster = []
+        #     bucket_com = ''
+        #     for i in range(0,len(selected)):
+        #         self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'show the following buckets ' + self.categories.get(selected[i]))
+        #         self.cluster.append(self.theBuckets[self.categories.get(selected[i])])
+        #         bucket_com = bucket_com + self.categories.get(selected[i]) + '|' 
+
+        #     self.cluster = list(chain.from_iterable(self.cluster)) 
+        #     self.cluster = list(set(self.cluster))
+        #     #self.cluster = self.cluster[np.nonzero(self.cluster)]
+        #     self.current_bucket = self.cluster
+        #     num_im = len(self.cluster)
+        #     self.communication_label.configure(text='The following buckets are shown: '+ bucket_com +'. These buckets contain a total of ' + str(num_im) + ' images.')
+            
+        # self.imagex = []
+        # self.cluster = np.asarray(self.cluster)
+        self.display_hyperedges()
     
         
     
@@ -1888,15 +1733,12 @@ class Application(Frame,object):
         self.bucketDisp = 0
         self.imagex = []
         self.c.delete("all")
-        num_c = self.num_clus
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'showing cluster ' + str(self.num_clus))
-        #df = pd.read_csv('forAppOID.csv', header=None) 
-        #df=df-1 #
+        # self.num_clus
+        # self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'showing cluster ' + str(self.num_clus))        
+        
         try:
-            cluster = np.asarray(self.df[:,num_c])
-           
+            cluster = np.asarray(self.df[:,self.num_clus])
             cluster = cluster[cluster > -1]
-            #print(cluster)
             self.currentcluster = cluster
             self.greentangles = []
             self.communication_label.configure(text='You are currently viewing cluster ' + str(self.num_clus+1) +' out of ' + str(self.df.shape[1]) + ' clusters. This cluster contains ' + str(len(cluster)) + ' images.')
@@ -1905,6 +1747,27 @@ class Application(Frame,object):
         self.display_images(cluster)
     #function to save the current session as a pickle file. The buckets, the list of images, the clusters, the current cluster number, the array with correlations, and the array with features are saved.
     
+
+    def initialize_hyperedges(self):
+        n_images, n_hyperedges = self.df.shape
+        self.hyperedges = {}
+        self.image_mapping = {}
+        for h_idx in range(n_hyperedges):
+            hyperedge_name = f'edge_{h_idx}'
+            # Get the column corresponding to the hyperedge
+            column = self.df[:, h_idx]
+            # Find image indices where the entry is 1
+            image_indices = np.nonzero(column)[0]
+            # Update hyperedges dictionary
+            self.hyperedges[hyperedge_name] = set(image_indices)
+            
+            # Update images dictionary
+            for i_idx in image_indices:
+                if i_idx not in self.image_mapping:
+                    self.image_mapping[i_idx] = set()
+                self.image_mapping[i_idx].add(hyperedge_name)
+
+
 
     def save_as(self):
         self.catList = self.categories.get(0, END)
@@ -1919,25 +1782,27 @@ class Application(Frame,object):
             h5_im_list = [n.encode("utf-8", "ignore") for n in self.im_list]
             create_or_replace_dataset('im_list', h5_im_list)
     
-            h5_log = [n.encode("utf-8", "ignore") for n in self.log]
-            create_or_replace_dataset('log', h5_log)
+            # h5_log = [n.encode("utf-8", "ignore") for n in self.log]
+            # create_or_replace_dataset('log', h5_log)
     
             create_or_replace_dataset('df', self.df)
     
             h5_catlist = [n.encode("utf-8", "ignore") for n in list(self.catList)]
             create_or_replace_dataset('catList', h5_catlist)
-    
-            keyz = list(self.theBuckets.keys())
-            keyz = [n.encode("utf-8", "ignore") for n in keyz]
-            keyz_vals = list(self.theBuckets.values())
-            keyz_num = np.arange(len(keyz))
-            
-            create_or_replace_dataset('keyz', keyz)
-            create_or_replace_dataset('keyz_num', keyz_num)
-            
-            for key in keyz_num:
-                create_or_replace_dataset(str(key), keyz_vals[key])
-    
+
+            # Save hyperedges dictionary           
+            hyperedge_names = list(self.hyperedges.keys())
+            hyperedge_image_ids = [np.array(list(image_ids), dtype='int64') for image_ids in self.hyperedges.values()]
+            dt = h5py.vlen_dtype(np.dtype('int64'))
+            create_or_replace_dataset('hyperedge_names', np.array(hyperedge_names, dtype=h5py.string_dtype()))
+            create_or_replace_dataset('hyperedge_image_ids', np.array(hyperedge_image_ids, dtype=dt))
+            # Save image_mapping dictionary
+            image_ids = list(self.image_mapping.keys())
+            image_hyperedge_names = [np.array(list(hyperedge_names), dtype=h5py.string_dtype()) for hyperedge_names in self.image_mapping.values()]
+            dt_str = h5py.vlen_dtype(h5py.string_dtype())
+            create_or_replace_dataset('image_ids', np.array(image_ids, dtype='int64'))
+            create_or_replace_dataset('image_hyperedge_names', np.array(image_hyperedge_names, dtype=dt_str))
+
             create_or_replace_dataset('num_clus', self.num_clus)
     
             path_list = [self.hdf_path]
@@ -1945,160 +1810,71 @@ class Application(Frame,object):
             create_or_replace_dataset('cm_path', p_list)
     
             create_or_replace_dataset('features', self.features)
-            create_or_replace_dataset('X_embed', self.x_test)
+            # create_or_replace_dataset('X_embed', self.x_test)
     
             self.communication_label.configure(text='Saved!')
 
     
-    # def save_as(self):
-    #     self.catList = self.categories.get(0,END)        
-    #     self.answer = filedialog.asksaveasfilename(defaultextension=".h5")   #this will make the file path a string
-    #     #if self.answer == self.hdf_path:
-    #     with h5py.File(self.answer, 'a') as hdf:
-    #         try:
-    #             h5_im_list = [n.encode("utf-8", "ignore") for n in self.im_list]
-    #             hdf.create_dataset('im_list',data=h5_im_list)
-    #         except RuntimeError:
-    #             del hdf['im_list']
-    #             h5_im_list = [n.encode("utf-8", "ignore") for n in self.im_list]
-    #             hdf.create_dataset('im_list',data=h5_im_list)
-    #         try:
-    #             h5_log = [n.encode("utf-8", "ignore") for n in self.log]
-    #             hdf.create_dataset('log',data=h5_log)
-    #         except RuntimeError:
-    #             del hdf['log']
-    #             h5_log = [n.encode("utf-8", "ignore") for n in self.log]
-    #             hdf.create_dataset('log',data=h5_log)
-    #         try:
-    #             hdf.create_dataset('df',data=self.df)
-    #             #self.df.to_hdf(self.answer, key='df', mode='a')
-    #         except RuntimeError:
-    #             del hdf['df']
-    #             hdf.create_dataset('df',data=self.df)
-    #             #self.df.to_hdf(self.answer, key='df', mode='a')
-    #         try:
-    #             h5_catlist = [n.encode("utf-8", "ignore") for n in list(self.catList)]
-    #             hdf.create_dataset('catList',data=h5_catlist)
-    #         except RuntimeError:
-    #             del hdf['catList']
-    #             h5_catlist = [n.encode("utf-8", "ignore") for n in self.catList]
-    #             hdf.create_dataset('catList',data=h5_catlist)
-    #         #### Storing theBuckets #####
-    #         keyz = list(self.theBuckets.keys())
-    #         keyz = [n.encode("utf-8", "ignore") for n in keyz]
-    #         keyz_vals = list(self.theBuckets.values())
-    #         keyz_num = np.arange(len(keyz))
-            
-    #         try:
-    #             hdf.create_dataset('keyz',data=keyz)
-    #         except RuntimeError:
-    #             del hdf['keyz']
-    #             hdf.create_dataset('keyz',data=keyz)
-    #         try:
-    #             hdf.create_dataset('keyz_num',data=keyz_num)
-    #         except RuntimeError:
-    #             del hdf['keyz_num']
-    #             hdf.create_dataset('keyz_num',data=keyz_num)
-    #         for key in keyz_num:
-    #             try:
-    #                 hdf.create_dataset(str(key),data=keyz_vals[key])
-    #             except RuntimeError:
-    #                 del hdf[str(key)]
-    #                 hdf.create_dataset(str(key),data=keyz_vals[key])
-    #             ############################
-    #         try:
-    #             hdf.create_dataset('num_clus',data=self.num_clus)
-    #         except RuntimeError:
-    #             del hdf['num_clus']
-    #             hdf.create_dataset('num_clus',data=self.num_clus)
-            
-    #         try:
-    #             path_list = []
-    #             path_list.append(self.hdf_path)
-    #             p_list = [n.encode("utf-8", "ignore") for n in path_list]
-    #             hdf.create_dataset('cm_path',data=p_list)
-    #         except RuntimeError:
-    #             del hdf['cm_path']
-    #             path_list = []
-    #             path_list.append(self.hdf_path)
-    #             p_list = [n.encode("utf-8", "ignore") for n in path_list]
-    #             hdf.create_dataset('cm_path',data=p_list)                
-    #         try:
-    #             hdf.create_dataset('features',data=self.features)
-    #         except RuntimeError:
-    #             del hdf['features']
-    #             hdf.create_dataset('features',data=self.features)
-    #         try:
-    #             hdf.create_dataset('X_embed',data=self.x_test)
-    #         except RuntimeError:
-    #             del hdf['X_embed']
-    #             hdf.create_dataset('X_embed',data=self.x_test)
-
-    #         self.communication_label.configure(text='Saved!')        
     #function to load a previous session. 
     def load_as(self):
-        self.answer2 = filedialog.askopenfilename(defaultextension=".h5")   #this will make the file path a string
+        self.answer2 = filedialog.askopenfilename(defaultextension=".h5")  # This will make the file path a string
         with h5py.File(self.answer2, 'r') as hdf:
-            self.im_list = list(hdf.get('im_list'))
-            self.im_list = [n.decode("utf-8", "ignore") for n in self.im_list]
-            
-            self.log = list(hdf.get('log'))
-            self.log = [n.decode("utf-8", "ignore") for n in self.log]
-            
-            #self.df = pd.read_hdf(self.answer2, 'df')    
-            self.df = np.array(hdf.get('df'))
-            self.catList = list(hdf.get('catList'))
-            self.catList = [n.decode("utf-8", "ignore") for n in self.catList]
-            self.catList = tuple(self.catList)
-            #### loading theBuckets ####
-            keyz = list(hdf.get('keyz'))
-            keyz = [n.decode("utf-8", "ignore") for n in keyz]
-            keyz_num = np.arange(len(keyz))
-            self.theBuckets = dict.fromkeys(keyz)
-            for key in keyz_num:
-                self.theBuckets[keyz[key]] = np.array(hdf.get(str(key)))
-            ##########
-            self.num_clus = np.array(hdf.get('num_clus'))
+            # Load image list
+            self.im_list = hdf['file_list'][()]
+            # If the elements are bytes, decode them to strings
+            if isinstance(self.im_list[0], bytes):
+                self.im_list = [n.decode("utf-8", "ignore") for n in self.im_list]
 
-            #self.hdf_path = list(hdf.get('cm_path'))
-            #self.hdf_path = [n.decode("utf-8", "ignore") for n in self.hdf_path][0]
-            self.hdf_path = self.answer2
-            self.features = np.array(hdf.get('features'))
-            self.x_test = np.array(hdf.get('X_embed'))
-        # try:
-        #     pickle_in = open(self.answer2,"rb")        
-        #     self.im_list,self.df,self.catList,self.theBuckets,self.num_clus, self.cm, self.features, self.loaded_imgs, self.X_embed = pickle.load(pickle_in) #new version with TSNE
-        # except ValueError:
-        #         pickle_in = open(self.answer2,"rb")        
-        #         self.im_list,self.df,self.catList,self.theBuckets,self.num_clus, self.cm, self.features, self.loaded_imgs = pickle.load(pickle_in) #load old version without TSNE
-            
-        # pickle_in.close()
-        # if len(self.loaded_imgs) > 0:
-        #     self.preloaded = 1
-        #     for z in range(len(self.loaded_imgs)):
-        #         self.allimages.append(ImageTk.PhotoImage(self.loaded_imgs[z]))
-            boxscrollbar = Scrollbar(width = 10)
-            self.categories.delete(0,END)
-            self.categories2.delete(0, END)
-            self.categories3.delete(0, END)
-            for k in range(0,len(self.catList)):
-                self.categories.insert(END,self.catList[k])
-                self.categories2.insert(END,self.catList[k])
-                self.categories3.insert(END,self.catList[k])
-            boxscrollbar.config(command=self.categories.yview)
-            boxscrollbar.place(in_=self.categories,relx=1.0, relheight=1)
-            self.categories.bind('<Button-1>', self.deselect_list )
-            if len(self.im_list) > 0:                
-                with h5py.File(self.hdf_path, 'r') as hdf_cm:
-                    if hdf_cm['cm'].len() > 0:
-                        if len(self.df) > 0:
-                            self.communication_label.configure(text='You loaded ' + str(self.answer2) + '. This session contains ' + str(len(self.im_list)) + ' images and ' + str(self.df.shape[1]) + ' clusters.')
-                        else:
-                            self.communication_label.configure(text='You loaded ' + str(self.answer2) + '. This session contains ' + str(len(self.im_list)) + ' images. The features are calculated, but still need to be clustered.')
-                    else:
-                        self.communication_label.configure(text='You loaded ' + str(self.answer2) + '. This session contains ' + str(len(self.im_list)) + ' images. The features still need to be calculated.')
+            # Load clustering results
+            # Assuming 'clustering_results' is a dataset containing numerical data
+            self.df = hdf['clustering_results'][()]
+
+            # Check if 'catList' exists in the HDF5 file
+            if 'catList' in hdf:
+                self.catList = list(hdf['catList'][()])
+                # Decode bytes to strings if necessary
+                if isinstance(self.catList[0], bytes):
+                    self.catList = [n.decode("utf-8", "ignore") for n in self.catList]
             else:
-                self.communication_label.configure(text='You loaded ' + str(self.answer2) + '. This session is still fresh. Select an image folder on the left to begin.')
+                # Create catList based on the number of columns in self.df
+                num_columns = self.df.shape[1]
+                self.catList = tuple(f'edge_{i}' for i in range(num_columns))
+
+            if 'hyperedges' in hdf:
+                hyperedge_names = hdf['hyperedge_names'][()]
+                hyperedge_image_ids = hdf['hyperedge_image_ids'][()]
+                self.hyperedges = {
+                    name: set(ids) for name, ids in zip(hyperedge_names, hyperedge_image_ids)
+                }
+
+                image_ids = hdf['image_ids'][()]
+                image_hyperedge_names = hdf['image_hyperedge_names'][()]
+                self.image_mapping = {
+                    id: set(names) for id, names in zip(image_ids, image_hyperedge_names)
+                }
+            else:
+                self.initialize_hyperedges()
+
+            # Load 'num_clus' if it exists
+            if 'num_clus' in hdf:
+                self.num_clus = hdf['num_clus'][()]
+            else:
+                self.num_clus = 0  # Or set a default value
+
+            self.hdf_path = self.answer2
+            self.features = hdf['features'][()]
+
+        # Update categories Listbox
+        self.categories.delete(0, END)
+        for category in self.catList:
+            self.categories.insert(END, category)
+
+        # Configure scrollbar for the Listbox
+        boxscrollbar = Scrollbar(width=10)
+        boxscrollbar.config(command=self.categories.yview)
+        boxscrollbar.place(in_=self.categories, relx=1.0, relheight=1)
+        self.categories.bind('<Button-1>', self.deselect_list)
+
 
     #function to export (make a copy of) all the images in all the buckets to folders with the buckets' names, in a location specified by the user.        
     def export_buckets(self):
@@ -2136,8 +1912,7 @@ class Application(Frame,object):
             self.communication_label.configure(text='Continue by pressing the Calculate image features button')
             self.sel_folder.set('found ' + str(len(self.im_list)) + ' images in ' + self.selected_folder)
 
-
-
+    
 
 
     #function to extract features from a neural network as defined below. New networks can be added if needed.
@@ -2145,7 +1920,7 @@ class Application(Frame,object):
             f = im_list
             with h5py.File(self.hdf_path, 'a') as hdf:
                 try:
-                    hdf.create_dataset('thumbnails',((len(im_list),100,100,3)),chunks=(1,100,100,3),maxshape=(None,100,100,3))
+                    hdf.create_dataset('thumbnail_images',((len(im_list),100,100,3)),chunks=(1,100,100,3),maxshape=(None,100,100,3))
                 except RuntimeError:
                     pass
 
@@ -2305,13 +2080,12 @@ class Application(Frame,object):
                         img_to_store = img_to_store[:,:,0:3]
                     elif img_to_store.shape[2] == 2:
                         img_to_storex = np.zeros((100,100,3))+200
-                        print(img_to_store.shape)
                         img_to_storex[:,:,0:2] = img_to_store
                         img_to_store = img_to_storex
                     if new_imgs == True:
-                        hdf['thumbnails'][i+len(self.features)] = img_to_store
+                        hdf['thumbnail_images'][i+len(self.features)] = img_to_store
                     else:
-                        hdf['thumbnails'][i] = img_to_store
+                        hdf['thumbnail_images'][i] = img_to_store
                     print ("\r Extracting image {} out of {} images ".format(i+1,len(f)), end="")
     #                if i%10 == 0:
                     self.communication_label.configure(text='Processing image '+ str(i) + ' of ' + str(len(f)))
@@ -2614,7 +2388,7 @@ class Application(Frame,object):
             
         num_new_images = len(new_images)
         with h5py.File(self.hdf_path, 'a') as hdf:
-            hdf['thumbnails'].resize((len(hdf['thumbnails']) + num_new_images, 100, 100, 3))
+            hdf['thumbnail_images'].resize((len(hdf['thumbnail_images']) + num_new_images, 100, 100, 3))
 
         new_features = self.feature_extraction(self.neuralnet,new_images,new_imgs=True)
         block_size = 1000
@@ -2880,1058 +2654,159 @@ class Application(Frame,object):
         num_c = 0
         self.num_c = 0
     
-    def calculate_image_map(self):
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'calculate image map')        
-        def scroll_start(event):
-            self.c.scan_mark(event.x, event.y)
-            self.evex = self.c.canvasx(event.x)
-            self.evey = self.c.canvasy(event.y)
+
+    def hyperedge_preparation(self):
+        """Based on the currently selected hyperedge, determine which other hyperedges need to be shown."""
+        if self.selected_edge is None:            
+            self.selected_edge = next(iter(self.hyperedges))
+        self.edge_images = self.hyperedges[self.selected_edge]
+        overlapping_hyperedges = set()
+        for image_id in self.edge_images:
+            hyperedges_of_image = self.image_mapping[image_id]
+            overlapping_hyperedges.update(hyperedges_of_image)
+
+        overlapping_hyperedges.discard(self.selected_edge)
+        self.overlapping_hyperedges = overlapping_hyperedges
+        self.edge_images = np.array(list(self.edge_images), dtype=int)
+
+    def display_overlapping_hyperedges(self):
+        # Destroy existing widgets in the new window
+        for widget in self.newWindow.winfo_children():
+            widget.destroy()
+        
+        # Clear the list of hyperedge_canvases
+        self.hyperedge_canvases.clear()
+        
+        # Create a main canvas and scrollbar in the new window
+        self.main_canvas = Canvas(self.newWindow, bg='#555555')
+        self.main_canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
+        
+        scrollbar = Scrollbar(self.newWindow, orient=VERTICAL, command=self.main_canvas.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        
+        self.main_canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Create a frame inside the main canvas
+        frame = Frame(self.main_canvas, bg='#555555')
+        self.main_canvas.create_window((0, 0), window=frame, anchor='nw')
+        
+        # Update scrollregion when the frame size changes
+        frame.bind('<Configure>', lambda e: self.main_canvas.configure(scrollregion=self.main_canvas.bbox('all')))
+        
+        # For each overlapping hyperedge, create a canvas and display images
+        for hyperedge in self.overlapping_hyperedges:
+            # Label for the hyperedge
+            label = Label(frame, text=f"Hyperedge: {hyperedge}", bg='#555555', fg='white', font=('Arial', 14))
+            label.pack(fill=X, padx=10, pady=5)
+        
+            # Frame to hold the canvas and its scrollbar
+            canvas_frame = Frame(frame)
+            canvas_frame.pack(padx=10, pady=5, fill=BOTH, expand=TRUE)
+        
+            # Canvas for the hyperedge images
+            hyperedge_canvas = Canvas(canvas_frame, bg='#555555')
+            hyperedge_canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
+        
+            # Vertical scrollbar for the hyperedge canvas
+            v_scrollbar = Scrollbar(canvas_frame, orient=VERTICAL, command=hyperedge_canvas.yview)
+            v_scrollbar.pack(side=RIGHT, fill=Y)
+        
+            hyperedge_canvas.configure(yscrollcommand=v_scrollbar.set)
+        
             
-        def scroll_move(event):
-            self.c.scan_dragto(event.x, event.y, gain=1)
-            self.evex2 = self.c.canvasx(event.x)
-            self.evey2 = self.c.canvasy(event.y)
-            self.c.bind("<ButtonRelease-1>", self.update_map)
+            # Bind mouse wheel events to the hyperedge canvas
+            hyperedge_canvas.bind('<Enter>', lambda event: event.widget.focus_set())
+            hyperedge_canvas.bind('<Enter>', self._bound_to_mousewheel_second_window)
+            hyperedge_canvas.bind('<Leave>', self._unbound_to_mousewheel_second_window)
+            hyperedge_canvas.bind('<Button-2>', self.open_image3)
+            hyperedge_canvas.bind('<Button-1>', self.click_select)
+            hyperedge_canvas.bind('<Shift-Button-1>', self.shift_click_select)
+            hyperedge_canvas.bind('<Control-Button-1>', self.ctrl_click_select)
+            hyperedge_canvas.bind('<Button-3>', self.rank_images)
+            hyperedge_canvas.bind('<Double-Button-1>', self.double_click_overview)
+        
+            # Create an inner frame inside the hyperedge canvas
+        
+            # Update scrollregion when the inner frame size changes
             
-        if len(self.x_test) < 1: #get TSNE embedding and normalize it.
-            modelu = umap.UMAP()
-            self.x_test = modelu.fit_transform(self.features)                
-            self.X_embed = copy.deepcopy(self.x_test)
-            self.X_embed[:,0] = self.X_embed[:,0] + abs(np.min(self.X_embed[:,0]))
-            self.X_embed[:,1] = self.X_embed[:,1] + abs(np.min(self.X_embed[:,1]))
-            self.X_embed[:,0] = self.X_embed[:,0]/np.max(self.X_embed[:,0])
-            self.X_embed[:,1] = self.X_embed[:,1]/np.max(self.X_embed[:,1])
+            self.hyperedge_canvases.append(hyperedge_canvas)
+            # Get image IDs and display them on the inner frame
+            image_ids = self.hyperedges[hyperedge]
+            image_indices = np.array(list(image_ids), dtype=int)
+            # inner_frame = Frame(hyperedge_canvas, bg='#555555')
+            # inner_frame.bind('<Configure>', lambda e, canvas=hyperedge_canvas: canvas.configure(scrollregion=canvas.bbox('all')))
+            # hyperedge_canvas.create_window((0, 0), window=inner_frame, anchor='nw')
+
+            self.display_images_on_canvas(self.hyperedge_canvases[-1], image_indices)
+            # self.display_images_on_frame(inner_frame, image_indices)
 
 
-        
-        #if len(self.zearray_reduced) == 0:
-            
-            
-        #     data_len = len(self.X_embed)
-        #     #self.X_embed = mahdatanorm
-        #     zearray = lil_matrix((data_len, data_len),dtype='int')
-        #     arr_len = zearray.shape[0]
-            
-        #     # labels = np.arange(0,len(mahdatanorm))
-        #     # fig, ax = plt.subplots()
-        #     # ax.scatter(mahdatanorm[:,0],mahdatanorm[:,1])
-        #     # for i, txt in enumerate(labels):
-        #     #     ax.annotate(str(txt), (mahdatanorm[:,0][i], mahdatanorm[:,1][i]))
-            
-        #     middle_point_array = (int(arr_len/2),int(arr_len/2))
-        #     middle_point_data = (np.max(self.X_embed[:,0])/2,np.max(self.X_embed[:,1])/2)
-            
-        #     im_in_array = []
-        #     im_loc_in_array = []
-        #     im_spot_in_array = []
-        #     # empty_locs = np.arange(0,zearray.shape[0])
-        #     # empty_locs = np.vstack((empty_locs,empty_locs)).T
-        #     for sq in range(len(self.X_embed)):
-        #         if sq == 0:
-        #             d_to_mid = distance.cdist([middle_point_data], self.X_embed, 'euclidean')
-        #             closest = np.argmin(d_to_mid)
-        #             zearray[middle_point_array] = closest
-        #             im_loc_in_array.append((self.X_embed[closest]))
-        #             d_to_mid[0,closest] = len(self.X_embed)+10
-        #             im_in_array.append(closest)
-        #             im_spot_in_array.append(middle_point_array)
-                    
-        #             #empty_locs[np.where(empty_locs==middle_point_array)[0][0]] = [arr_len*3,arr_len*3]
-                    
-        #         else:        
-        #             closest = np.argmin(d_to_mid)
-        #             d_to_im_in_array = distance.cdist([self.X_embed[closest]], im_loc_in_array, 'euclidean')
-        #             closest_im = np.argmin(d_to_im_in_array)
-        #             im_relation = [self.X_embed[im_in_array[closest_im]],self.X_embed[closest]]
-        #             left_right = im_relation[0][0] - im_relation[1][0]
-        #             up_down = im_relation[0][1] - im_relation[1][1]
-        #             if abs(left_right) <= abs(up_down):
-        #                 y_pos = 0
-        #                 if up_down > 0:
-        #                     x_pos = -1
-        #                 else:
-        #                     x_pos = 1
-        #                 new_pos = (x_pos,y_pos)
-        #             else: 
-        #                 x_pos = 0
-        #                 if left_right > 0:
-        #                     y_pos = 1
-        #                 else:
-        #                     y_pos = -1
-        #                 new_pos = (x_pos,y_pos)
-            
-        #             preferred_location = tuple(np.subtract(im_spot_in_array[closest_im],new_pos))
-        #             if zearray[preferred_location] != 0:                                        
-        #                 if arr_len > 1000:
-        #                     sq_size = 20
-        #                     if preferred_location[0]>sq_size:
-        #                         side1 = preferred_location[0]-sq_size
-        #                     else:
-        #                         side1 = 0
-        #                     if preferred_location[0]+sq_size>arr_len:
-        #                         side1 = arr_len-(2*sq_size)
-        #                     if preferred_location[1]>sq_size:
-        #                         side2 = preferred_location[1]-sq_size
-        #                     else:
-        #                         side2 = 0
-        #                     if preferred_location[1]+sq_size>arr_len:
-        #                         side2 = arr_len-(2*sq_size)
-                            
-            
-        #                     empty_locs_h = zearray[side1:side1+(2*sq_size),side2:side2+(2*sq_size)].toarray()
-        #                     empty_locs_h = np.where((empty_locs_h==0))
-        #                     empty_locs= np.array([empty_locs_h[0]+side1, empty_locs_h[1]+side2]).T
-        #                 else:
-        #                     empty_locs = np.asarray(np.where((zearray.toarray()==0))).T
-            
-                        
-        #                 preferred_location = tuple(empty_locs[np.argmin(distance.cdist([preferred_location], empty_locs, 'euclidean'))])
-        #             zearray[preferred_location] = closest+1 ## add one so i can later subtract 1  to produce an array with -1
-        #             im_in_array.append(closest)
-        #             im_spot_in_array.append(preferred_location)
-        #             im_loc_in_array.append((self.X_embed[closest]))
-        #             d_to_mid[0,closest] = len(self.X_embed)+10
-            
-        #     zearray_x = np.where(np.sum(zearray,1)>0)[0]
-        #     zearray_y = np.where(np.sum(zearray,0)>0)[1]
-    
-        #     #zearray_reduced = np.zeros((len(zearray_x),len(zearray_y)))
-        #     self.zearray_reduced = zearray[zearray_x[0]:zearray_x[-1]+1,zearray_y[0]:zearray_y[-1]+1]
-        #     self.zearray_reduced = self.zearray_reduced.toarray()-1
-            
-            
-    
-        #     #self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance))
-            
-            
-        #     #########################################################
-            
-        #x_arr = math.floor(len(self.features)**0.5)
-        #y_arr = math.floor(len(self.features)**0.5) + 1
-    
-        #     self.zearray_reduced = np.zeros((x_arr,y_arr),dtype='int')-1
-            
-            
-        #     Y_embed = copy.deepcopy(self.X_embed)
-        #     Y_embed[:,0] = Y_embed[:,0] * x_arr
-        #     Y_embed[:,1] = Y_embed[:,1] * y_arr
-            
-        #     count = 0
-            
-        #     if count <= len(self.features):
-        #         for i in range(x_arr):
-        #             for j in range(y_arr):
-        #                 d_to_mid = np.argmin(distance.cdist(np.array([[i,j]]),Y_embed, 'euclidean'))
-        #                 self.zearray_reduced[i,j] = int(d_to_mid)
-        #                 Y_embed[d_to_mid] = [10000,10000]
-                        
 
-        
-        rasterfairylist = rasterfairy.transformPointCloud2D(self.x_test)
-        rasterfairy_grid = np.asarray(rasterfairylist[0],dtype='int')
-        self.zearray_reduced = np.zeros((np.max(rasterfairylist[1]),np.max(rasterfairylist[1])),dtype='int') - 1
-        for loc in range(len(rasterfairy_grid)):
-            self.zearray_reduced[rasterfairy_grid[loc][0],rasterfairy_grid[loc][1]] = int(loc)
-        
-        # with open('E:\\PhD\\exps\\expMapping\\imex_mapping.pickle', 'wb') as handle:
-        #     pickle.dump([rasterfairy_grid,self.zearray_reduced,self.x_test],handle,protocol=pickle.HIGHEST_PROTOCOL)
 
-        
-        ### now to make it so it only loads images in view.
-        self.c.delete("all")
-        count_im_in_c = 0
-        self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance)) #the total number of images that fit from left to right
-        self.num_im_col = math.floor(self.screen_height / (self.imsize + self.image_distance)) #the total number of images that fit from top to bottom
-        
-        #place corner points to create playing field
-        bb_x = self.zearray_reduced.shape[1] * (self.imsize + self.image_distance)
-        bb_y = self.zearray_reduced.shape[0] * (self.imsize + self.image_distance)
-        self.c.create_text(0,0,fill="darkblue",font="Times 20 italic bold",
-                        text=".")
-        self.c.create_text(bb_x,0,fill="darkblue",font="Times 20 italic bold",
-                        text=".")
-        self.c.create_text(0,bb_y,fill="darkblue",font="Times 20 italic bold",
-                        text=".")
-        self.c.create_text(bb_x,bb_y,fill="darkblue",font="Times 20 italic bold",
-                        text=".")
-        
-        # starting point of map, middle of self.zearray_reduced. I think 2x screenwidth/height  should be fine.
-        cur_x = int(self.zearray_reduced.shape[1]/2)
-        cur_y = int(self.zearray_reduced.shape[0]/2)
-        self.load_extra_screen = 1.2
-        cur_x_min = cur_x - int(self.num_im_row * self.load_extra_screen)
-        cur_x_max = cur_x + int(self.num_im_row * self.load_extra_screen)
-        if cur_x_min < 0: 
-            cur_x_min = 0
-            cur_x_max = cur_x_min + int(self.num_im_row * self.load_extra_screen)
-        if cur_x_max > self.zearray_reduced.shape[1]: 
-            cur_x_max = self.zearray_reduced.shape[1]
-            cur_x_min = cur_x_max - int(self.num_im_row * self.load_extra_screen)
-            if cur_x_min < 0: 
-                cur_x_min = 0
-        cur_y_min = cur_y - int(self.num_im_col * self.load_extra_screen)
-        cur_y_max = cur_y + int(self.num_im_col * self.load_extra_screen)
-        if cur_y_min < 0: 
-            cur_y_min = 0
-            cur_y_max = cur_y_min + int(self.num_im_col * self.load_extra_screen)
-        if cur_y_max > self.zearray_reduced.shape[0]: 
-            cur_y_max = self.zearray_reduced.shape[0]
-            cur_y_min = cur_y_max - int(self.num_im_col * self.load_extra_screen)
-            if cur_y_min < 0: 
-                cur_y_min = 0
-        
-        self.cur_zearray = self.zearray_reduced[cur_y_min:cur_y_max,cur_x_min:cur_x_max]
-        self.imagex = []
-        self.imlocs = []
-        self.ccluster = []
-        ## this is for partial map, where you only load a part of the map to reduce resources
+    def display_images_on_canvas(self, canvas, image_indices):
+        # Similar setup as in display_images, but use the provided canvas
+        num_im_row = math.floor(800 / (self.imsize + self.image_distance))  # Assuming canvas width is 800
+
+        # Prepare the canvas scroll region
+        total_rows = math.ceil(len(image_indices) / num_im_row)
+        canvas.config(scrollregion=(0, 0, 0, total_rows * (self.imsize + self.image_distance)))
+
+        # Clear the canvas
+        canvas.delete("all")
+
+        # Initialize a list to store image references
+        if not hasattr(canvas, 'image_refs'):
+            canvas.image_refs = []
+        else:
+            # Clear previous references
+            canvas.image_refs.clear()
+
+        # Load and display images
         with h5py.File(self.hdf_path, 'r') as hdf:
-            for j in range(self.cur_zearray.shape[0]):
-                for k in range(self.cur_zearray.shape[1]):
-                    if self.cur_zearray[j,k] > -1:
-                        load = Image.fromarray(np.array(hdf.get('thumbnails')[self.cur_zearray[j,k]],dtype='uint8'))
-                        self.ccluster.append(self.cur_zearray[j,k])
-                        # load = Image.open(self.im_list[cur_zearray[j,k]])
-                        # try:
-                        #     for orientation in ExifTags.TAGS.keys():
-                        #         if ExifTags.TAGS[orientation]=='Orientation':
-                        #             break
-                        #     exif=dict(load._getexif().items())
-                        
-                        #     if exif[orientation] == 3:
-                        #         load=load.rotate(180, expand=True)
-                        #     elif exif[orientation] == 6:
-                        #         load=load.rotate(270, expand=True)
-                        #     elif exif[orientation] == 8:
-                        #         load=load.rotate(90, expand=True)
-                        # except AttributeError:
-                        #     pass
-                        # except KeyError:
-                        #     pass
-                        # load = load.resize((self.imsize,self.imsize))
-                        render = ImageTk.PhotoImage(load)         
-                        self.my_img.append([])
-                        self.my_img[count_im_in_c] = Label(self.c,background='#555555')
-                        self.my_img[count_im_in_c].image = render                      
-                        row_ = j + cur_y_min
-                        column_ = k + cur_x_min
-                        #print('row',row_)
-                        #print('col',column_)
-                        self.imagex.append(self.c.create_image(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2), image = render, tags =self.cur_zearray[j,k]))
-                        self.imlocs.append([column_*(self.imsize + self.image_distance)+ (self.imsize / 2)-(self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2)-(self.imsize / 2),column_*(self.imsize + self.image_distance)+ (self.imsize / 2)+(self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2)+(self.imsize / 2)])
-                        self.c.update()
-                        count_im_in_c += 1
-        ## this is for full map, wehre you load all images.
-        # for j in range(self.zearray_reduced.shape[0]):
-        #     for k in range(self.zearray_reduced.shape[1]):
-        #         if self.zearray_reduced[j,k] > -1:
-        #             load = Image.open(self.im_list[self.zearray_reduced[j,k]])
-        #             try:
-        #                 for orientation in ExifTags.TAGS.keys():
-        #                     if ExifTags.TAGS[orientation]=='Orientation':
-        #                         break
-        #                 exif=dict(load._getexif().items())
-                    
-        #                 if exif[orientation] == 3:
-        #                     load=load.rotate(180, expand=True)
-        #                 elif exif[orientation] == 6:
-        #                     load=load.rotate(270, expand=True)
-        #                 elif exif[orientation] == 8:
-        #                     load=load.rotate(90, expand=True)
-        #             except AttributeError:
-        #                 pass
-        #             except KeyError:
-        #                 pass
-        #             load = load.resize((self.imsize,self.imsize))
-        #             render = ImageTk.PhotoImage(load)         
-        #             self.my_img.append([])
-        #             self.my_img[count_im_in_c] = Label(self.c,background='#555555')
-        #             self.my_img[count_im_in_c].image = render                      
-        #             row_ = j
-        #             column_ = k
-        #             self.imagex.append(self.c.create_image(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2), image = render, tags =self.zearray_reduced[j,k]))
-        #             self.c.update()
-        #             count_im_in_c += 1
+            for idx, img_idx in enumerate(image_indices):
+                load = Image.fromarray(np.array(hdf.get('thumbnail_images')[img_idx], dtype='uint8'))
+                render = ImageTk.PhotoImage(load)
+                row_ = idx // num_im_row
+                column_ = idx % num_im_row
+                x_pos = column_ * (self.imsize + self.image_distance) + (self.imsize / 2)
+                y_pos = row_ * (self.imsize + self.image_distance) + (self.imsize / 2)
+                canvas.create_image(x_pos, y_pos, image=render)
+                # Keep a reference to prevent garbage collection
+                canvas.image_refs.append(render)
 
-        #### @### USE LOYDS ALGORITHMMM
+    def display_images_on_frame(self, frame, image_indices):
+        # Initialize a list to store image references
+        if not hasattr(frame, 'image_refs'):
+            frame.image_refs = []
+        else:
+            frame.image_refs.clear()
 
+        # Number of images per row based on the frame width
+        frame_width = 800  # Adjust as needed or get dynamically
+        num_im_row = frame_width // (self.imsize + self.image_distance)
 
-        #self.c['scrollregion'] = (0,0,0,math.ceil(len(x)/self.num_im_row)*(self.imsize+self.image_distance))
-        self.imlocs = np.asarray(self.imlocs,dtype=int)
-        self.ccluster = np.asarray(self.ccluster,dtype=int)
-        self.c['scrollregion']=self.c.bbox("all")        
-        self.c.bind("<ButtonPress-1>", scroll_start)
-        self.c.bind("<B1-Motion>", scroll_move)
-        self.c.xview_moveto(cur_x * (self.imsize+ self.image_distance)/self.c.bbox("all")[2])
-        self.c.yview_moveto(cur_y * (self.imsize+ self.image_distance)/self.c.bbox("all")[3])
-        self.c.update()
-       
-        self.selected_images = []
-        def xy(event):
-            self.outerline = []
-            self.outercoords = []
-            self.keepline = []
-            "Takes the coordinates of the mouse when you click the mouse"
-            global lastx, lasty
-            lastx, lasty = self.c.canvasx(event.x),self.c.canvasy(event.y)
-
-
-        def addLine(event):
-            """Creates a line when you drag the mouse
-            from the point where you clicked the mouse to where the mouse is now"""
-            global lastx, lasty
-            #self.c.create_line((lastx, lasty, event.x, event.y))
-            #self.keepline = []
-            self.keepline.append(self.c.create_line((lastx, lasty, self.c.canvasx(event.x),self.c.canvasy(event.y)),tag='keepline'))
-            lastx, lasty = self.c.canvasx(event.x),self.c.canvasy(event.y)
-            try:
-                # item_id = self.c.gettags(self.c.find_overlapping(lastx,lasty,lastx,lasty))[0]
-                # self.outerline.append(int(item_id))
-                self.outercoords.append([lastx, lasty])
-            except IndexError:
-                pass
-            
-            
-            # this makes the new starting point of the drawing
-            #lastx, lasty = event.x, event.y
-            #https://pythonprogramming.altervista.org/draw-in-tkinters-canvas/
-            # ray casting
-            # use some grid, maybe with overlap subtract.... 
-
-            
-            #self.keepline.append([lastx,lasty])
-        #function to connect first lasso point and final lasso point.
-        def get_coords_first_last_point(first,last):
-            first = np.flip(first)
-            last = np.flip(last)
-            fi = np.abs(first[0]-last[0])
-            fj = np.abs(first[1]-last[1])
-            fz = np.max([fi,fj])
-            try:
-                flinei = np.asarray(np.arange(np.min([first[0],last[0]]),np.max([first[0],last[0]]),fi/fz),dtype=int)
-            except ValueError:
-                flinei = np.zeros((fz),dtype=int) + first[0]
-            try:
-                flinej = np.asarray(np.arange(np.min([first[1],last[1]]),np.max([first[1],last[1]]),fj/fz),dtype=int)
-            except ValueError:
-                flinej = np.zeros((fz),dtype=int) + first[1]
-            if first[0] > last[0]:
-                flinei = np.flip(flinei)
-            if first[1] > last[1]:
-                flinej = np.flip(flinej)
-            flineij = np.asarray([flinei,flinej]).T
-            return flineij
-        
-        # the lasso drawer in tkinter actually draws tiny straight lines. Sometimes it doesnt update in time, leaving gaps in the lasso.
-        # this function fixes the gaps.
-        def the_smoother(outercoords):
-            new_outercoords = []
-            for ix in range(len(outercoords)-1):
-                diffi = abs(outercoords[ix][0] - outercoords[ix+1][0])
-                diffj = abs(outercoords[ix][1] - outercoords[ix+1][1])
-                diff = np.max([diffi,diffj])
-                if diff > 1:
-                    newbit = np.zeros((diff+1,2),dtype=int)
-                    newbit[:,0] = np.linspace(outercoords[ix][0],outercoords[ix+1][0],diff+1).astype(int)
-                    newbit[:,1] = np.linspace(outercoords[ix][1],outercoords[ix+1][1],diff+1).astype(int)
-                    new_outercoords.append(outercoords[ix,None])
-                    for nwb in range(len(newbit)):
-                        new_outercoords.append(newbit[nwb,None])
-                else:
-                    new_outercoords.append(outercoords[ix,None])
-            new_outercoords = np.asarray(new_outercoords).squeeze()
-            return new_outercoords
-            
-                    
-        def is_odd(num):
-            return num & 0x1
-        
-        def deselect_lasso(event):
-            for q in range(0,len(self.rectangles)):
-                self.c.delete(self.rectangles[q])
-            self.selected_images = []
-        
-        ## when multiple consecutive horizontal pixels are 1, only the one furthest to the right should stay.
-        def clean_theones(theones):
-            theones_clean = []            
-            cons = np.diff(theones)
-            for d in range(1,len(theones)):
-                if cons[d-1] == 1:
-                    if d == len(theones)-1:
-                        pass
-                else:
-                    theones_clean.append(theones[d-1])
-            theones_clean.append(theones[-1])
-            
-            return theones_clean
-                
-                
-            
-        
-        def yx(event):            
-            self.keepline = []
-            "Takes the coordinates of the mouse when you click the mouse"
-            global lastx, lasty
-            
-            self.outercoords = np.asarray(self.outercoords,dtype=int)
-            self.outercoords = the_smoother(self.outercoords)
-            self.template_selection = np.zeros((np.max(self.imlocs[:,3]),np.max(self.imlocs[:,2])))
-            for coord in self.outercoords:
-                self.template_selection[coord[1],coord[0]] = 1
-            
-            # with open('E:\\PhD\\exps\\expMapping\\sillytest.pickle', 'wb') as handle:
-            #     pickle.dump([self.template_selection,self.outercoords],handle,protocol=pickle.HIGHEST_PROTOCOL)
-
-            flinexy = get_coords_first_last_point(self.outercoords[0], self.outercoords[-1])
-            for cd in range(len(flinexy)):
-                self.template_selection[flinexy[cd][0],flinexy[cd][1]] = 1
-            
-            
-            for line in range(self.template_selection.shape[0]):
-                if 1 in self.template_selection[line]:
-                    theones = np.where(self.template_selection[line] == 1)[0]
-                    try: 
-                        theones = clean_theones(theones)
-                    except TypeError:
-                        pass                    
-                    for j in range(len(theones)):
-                        if is_odd(j):
-                            pass
-                        else:
-                            try:
-                                if 0 not in np.max(self.template_selection[0:line+1,theones[j]+1:theones[j+1]],0) and 0 not in np.max(self.template_selection[line::,theones[j]+1:theones[j+1]],0):
-                                    self.template_selection[line,theones[j]:theones[j+1]] = 1
-                            except IndexError:
-                                pass
-                            except ValueError:
-                                pass
-
-            for ix in range(len(self.imlocs)):
-                tly,tlx,bry,brx = self.imlocs[ix]
-                if 1 in self.template_selection[tlx:brx,tly:bry]:
-                    self.rectangles.append(self.c.create_rectangle(tly,tlx,bry,brx, outline='red',width=self.rectanglewidth,tags = ix))
-                    self.selected_images.append(ix)
-                    zetag = int(self.c.gettags(self.imagex[ix])[0])
-                  
-                        
-                        
-            ### MULTI SELECTIE WERKT NOG NIET....
-                
-            lastx, lasty = None, None
-            for tagitem in self.c.gettags('keepline'):
-                if 'keepline' in tagitem:
-                    self.c.delete(tagitem)
-            
-        
-            
-            
-            
-            
-        self.c.bind("<Shift-Button-1>", xy)
-        self.c.bind("<Shift-B1-Motion>", addLine)
-        self.c.bind("<Shift-ButtonRelease-1>", yx)
-        # self.c.bind("<Button-1>", deselect_lasso)
-        
-            #print('thius is:',self.whatthis)
-            # self.c.bind("<Button-1>", self.click_select)
-            # self.c.bind("<Shift-Button-1>", self.shift_click_select)
-            # self.c.bind("<Control-Button-1>", self.ctrl_click_select)
-            # self.c.bind('<Double-Button-1>', self.open_image3)
-            
-    
-    # def scroll_start(self, event):
-    #     self.c.scan_mark(event.x, event.y)
-    #     self.evex = self.c.canvasx(event.x)
-    #     self.evey = self.c.canvasy(event.y)
-    # def scroll_move(self, event):
-    #     self.c.scan_dragto(event.x, event.y, gain=1)
-    #     self.c.bind("<ButtonRelease-1>", self.update_map)
-
-    def update_map(self,event):
-        
-        def scroll_start(event):
-            self.c.scan_mark(event.x, event.y)
-            self.evex = self.c.canvasx(event.x)
-            self.evey = self.c.canvasy(event.y)
-            #self.whatthis = self.c.find_closest(self.c.canvasx(event.x), self.c.canvasy(event.y), halo=None, start=None) 
-            #self.whatthis = self.c.find_overlapping(self.evex,self.evey,self.evex,self.evey)[0]
-            
-        def scroll_move(event):
-            self.c.scan_dragto(event.x, event.y, gain=1)
-            self.evex2 = self.c.canvasx(event.x)
-            self.evey2 = self.c.canvasy(event.y)
-
-            self.c.bind("<ButtonRelease-1>", self.update_map)
-        
-     
-        
-        cust = 0
-        try:
-            evex = self.c.canvasx(event.x)
-            evey = self.c.canvasy(event.y)
-        except AttributeError:
-            print('err')
-            evex = event['x'][0]
-            evey = event['y'][0]
-            self.evex = evex-1
-            self.evey = evey-1
-            self.evex2 = self.evex
-            self.evey2 = self.evey
-            cust = 1
-        
-      
-        #if self.evex == self.evex2 and self.evey == self.evey2:
-        self.imagex = []
-        self.imlocs = []
-        self.c.delete("all")
-
-        try: #### this fixes a memory leak by deleting currently loaded images in the memory.
-            for uut in range(0,len(self.my_img)):
-                    self.my_img[uut].destroy()
-        except AttributeError:
-            pass
-        self.my_img = []
-        bb_x = self.zearray_reduced.shape[1] * (self.imsize + self.image_distance)
-        bb_y = self.zearray_reduced.shape[0] * (self.imsize + self.image_distance)
-        
-        self.c.create_text(0,0,fill="darkblue",font="Times 20 italic bold",
-                        text=".")
-        self.c.create_text(bb_x,0,fill="darkblue",font="Times 20 italic bold",
-                        text=".")
-        self.c.create_text(0,bb_y,fill="darkblue",font="Times 20 italic bold",
-                        text=".")
-        self.c.create_text(bb_x,bb_y,fill="darkblue",font="Times 20 italic bold",
-                        text=".")
-        cur_x = math.ceil((evex)/(self.imsize + self.image_distance))-1
-        cur_y = math.ceil((evey)/(self.imsize + self.image_distance))
-                # self.im_numX = x_num + self.num_im_row*(y_num-1) 
-                # self.selected_images = []
-                # self.rectangles = []
-                # self.selected_images.append(self.im_numX)
-                # row_ = math.floor(self.im_numX/self.num_im_row)
-                # column_ = self.im_numX%self.num_im_row
-        
-        # cur_x = int(self.zearray_reduced.shape[1]/2)
-        # cur_y = int(self.zearray_reduced.shape[0]/2)
-        cur_x_min = cur_x - int(self.num_im_row * self.load_extra_screen)
-        cur_x_max = cur_x + int(self.num_im_row * self.load_extra_screen)
-        if cur_x_min < 0: 
-            cur_x_min = 0
-            cur_x_max = cur_x + int(self.num_im_row * self.load_extra_screen)
-        if cur_x_max > self.zearray_reduced.shape[1]: 
-            cur_x_max = self.zearray_reduced.shape[1]
-            cur_x_min = cur_x - int(self.num_im_row * self.load_extra_screen)
-            if cur_x_min < 0: 
-                cur_x_min = 0
-        
-        cur_y_min = cur_y - int(self.num_im_col * self.load_extra_screen)
-        cur_y_max = cur_y + int(self.num_im_col * self.load_extra_screen)
-        if cur_y_min < 0: 
-            cur_y_min = 0
-            cur_y_max = cur_y + int(self.num_im_col * self.load_extra_screen)
-        if cur_y_max > self.zearray_reduced.shape[0]: 
-            cur_y_max = self.zearray_reduced.shape[0]
-            # cur_y_min = cur_y_max - self.num_im_col * self.load_extra_screen
-            # if cur_y_min < 0: 
-            #     cur_y_min = 0
-        
-        #self.c.update()
-        self.ccluster = []
-        self.cur_zearray = self.zearray_reduced[cur_y_min:cur_y_max,cur_x_min:cur_x_max]
-        ## this is for partial map, where you only load a part of the map to reduce resources
-        count_im_in_c = 0
+        # Load and display images
         with h5py.File(self.hdf_path, 'r') as hdf:
-            for j in range(self.cur_zearray.shape[0]):
-                for k in range(self.cur_zearray.shape[1]):
-                    if self.cur_zearray[j,k] > -1:
-                        load = Image.fromarray(np.array(hdf.get('thumbnails')[self.cur_zearray[j,k]],dtype='uint8'))
-                        self.ccluster.append(self.cur_zearray[j,k])
-                        # load = Image.open(self.im_list[cur_zearray[j,k]])
-                        # try:
-                        #     for orientation in ExifTags.TAGS.keys():
-                        #         if ExifTags.TAGS[orientation]=='Orientation':
-                        #             break
-                        #     exif=dict(load._getexif().items())
-                        
-                        #     if exif[orientation] == 3:
-                        #         load=load.rotate(180, expand=True)
-                        #     elif exif[orientation] == 6:
-                        #         load=load.rotate(270, expand=True)
-                        #     elif exif[orientation] == 8:
-                        #         load=load.rotate(90, expand=True)
-                        # except AttributeError:
-                        #     pass
-                        # except KeyError:
-                        #     pass
-                        # load = load.resize((self.imsize,self.imsize))
-                        render = ImageTk.PhotoImage(load)         
-                        self.my_img.append([])
-                        self.my_img[count_im_in_c] = Label(self.c,background='#555555')
-                        self.my_img[count_im_in_c].image = render                      
-                        row_ = j + cur_y_min
-                        column_ = k + cur_x_min
-                        self.imagex.append(self.c.create_image(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2), image = render, tags =self.cur_zearray[j,k]))
-                        self.imlocs.append([column_*(self.imsize + self.image_distance)+ (self.imsize / 2)-(self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2)-(self.imsize / 2),column_*(self.imsize + self.image_distance)+ (self.imsize / 2)+(self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2)+(self.imsize / 2)])
-                        #self.c.update()
-                        count_im_in_c += 1
-        self.c['scrollregion']=self.c.bbox("all")        
-        self.c.bind("<ButtonPress-1>", scroll_start)
-        self.c.bind("<B1-Motion>", scroll_move)
-        self.imlocs = np.asarray(self.imlocs,dtype=int)
-        self.ccluster = np.asarray(self.ccluster,dtype=int)
-        if cust == 1:
-            self.c.xview_moveto(evex/self.c.bbox("all")[2])
-            self.c.yview_moveto(evey/self.c.bbox("all")[3])
-            
-            
-        # self.c.xview_moveto(cur_x * (self.imsize+ self.image_distance))
-        # self.c.yview_moveto(cur_y * (self.imsize+ self.image_distance))
-        self.c.update()
-        # self.c.bind("<Button-1>", self.click_select)
-        # self.c.bind("<Shift-Button-1>", self.shift_click_select)
-        # self.c.bind("<Control-Button-1>", self.ctrl_click_select)
-        # self.c.bind('<Double-Button-1>', self.open_image3)
-        # else:
-        #     y__im = int(math.floor(self.evex/(self.imsize + self.image_distance)))
-        #     x__im = int(math.floor(self.evey/(self.imsize + self.image_distance)))
-        #     print('this is:',self.zearray_reduced[x__im,y__im],self.im_list[self.zearray_reduced[x__im,y__im]],'ximy',x__im,y__im,self.evex2,self.evex)
-        #     self.selected_images = self.zearray_reduced[x__im,y__im]
-        #     #self.c.after(50, self.update_map)
+            for idx, img_idx in enumerate(image_indices):
+                load = Image.fromarray(np.array(hdf.get('thumbnail_images')[img_idx], dtype='uint8'))
+                render = ImageTk.PhotoImage(load)
 
-    def map_select_lasso(self):
-        
-        self.selected_images = []
-        def xy(event):
-            self.outerline = []
-            self.outercoords = []
-            self.keepline = []
-            "Takes the coordinates of the mouse when you click the mouse"
-            global lastx, lasty
-            lastx, lasty = self.c.canvasx(event.x),self.c.canvasy(event.y)
+                row_ = idx // num_im_row
+                column_ = idx % num_im_row
+
+                label = Label(frame, image=render, bg='#555555')
+                label.grid(row=row_, column=column_, padx=self.image_distance//2, pady=self.image_distance//2)
+                # Keep a reference to prevent garbage collection
+                frame.image_refs.append(render)
 
 
-        def addLine(event):
-            """Creates a line when you drag the mouse
-            from the point where you clicked the mouse to where the mouse is now"""
-            global lastx, lasty
-            #self.c.create_line((lastx, lasty, event.x, event.y))
-            #self.keepline = []
-            self.keepline.append(self.c.create_line((lastx, lasty, self.c.canvasx(event.x),self.c.canvasy(event.y)),tag='keepline'))
-            lastx, lasty = self.c.canvasx(event.x),self.c.canvasy(event.y)
-            try:
-                # item_id = self.c.gettags(self.c.find_overlapping(lastx,lasty,lastx,lasty))[0]
-                # self.outerline.append(int(item_id))
-                self.outercoords.append([lastx, lasty])
-            except IndexError:
-                pass
-            
-            
-            # this makes the new starting point of the drawing
-            #lastx, lasty = event.x, event.y
-            #https://pythonprogramming.altervista.org/draw-in-tkinters-canvas/
-            # ray casting
-            # use some grid, maybe with overlap subtract.... 
 
-            
-            #self.keepline.append([lastx,lasty])
-        #function to connect first lasso point and final lasso point.
-        def get_coords_first_last_point(first,last):
-            first = np.flip(first)
-            last = np.flip(last)
-            fi = np.abs(first[0]-last[0])
-            fj = np.abs(first[1]-last[1])
-            fz = np.max([fi,fj])
-            try:
-                flinei = np.asarray(np.arange(np.min([first[0],last[0]]),np.max([first[0],last[0]]),fi/fz),dtype=int)
-            except ValueError:
-                flinei = np.zeros((fz),dtype=int) + first[0]
-            try:
-                flinej = np.asarray(np.arange(np.min([first[1],last[1]]),np.max([first[1],last[1]]),fj/fz),dtype=int)
-            except ValueError:
-                flinej = np.zeros((fz),dtype=int) + first[1]
-            if first[0] > last[0]:
-                flinei = np.flip(flinei)
-            if first[1] > last[1]:
-                flinej = np.flip(flinej)
-            flineij = np.asarray([flinei,flinej]).T
-            return flineij
-        
-        # the lasso drawer in tkinter actually draws tiny straight lines. Sometimes it doesnt update in time, leaving gaps in the lasso.
-        # this function fixes the gaps.
-        def the_smoother(outercoords):
-            new_outercoords = []
-            for ix in range(len(outercoords)-1):
-                diffi = abs(outercoords[ix][0] - outercoords[ix+1][0])
-                diffj = abs(outercoords[ix][1] - outercoords[ix+1][1])
-                diff = np.max([diffi,diffj])
-                if diff > 1:
-                    newbit = np.zeros((diff+1,2),dtype=int)
-                    newbit[:,0] = np.linspace(outercoords[ix][0],outercoords[ix+1][0],diff+1).astype(int)
-                    newbit[:,1] = np.linspace(outercoords[ix][1],outercoords[ix+1][1],diff+1).astype(int)
-                    new_outercoords.append(outercoords[ix,None])
-                    for nwb in range(len(newbit)):
-                        new_outercoords.append(newbit[nwb,None])
-                else:
-                    new_outercoords.append(outercoords[ix,None])
-            new_outercoords = np.asarray(new_outercoords).squeeze()
-            return new_outercoords
-            
-                    
-        def is_odd(num):
-            return num & 0x1
-        
-        def deselect_lasso(event):
-            for q in range(0,len(self.rectangles)):
-                self.c.delete(self.rectangles[q])
-            self.selected_images = []
-        
-        ## when multiple consecutive horizontal pixels are 1, only the one furthest to the right should stay.
-        def clean_theones(theones):
-            theones_clean = []            
-            cons = np.diff(theones)
-            for d in range(1,len(theones)):
-                if cons[d-1] == 1:
-                    if d == len(theones)-1:
-                        pass
-                else:
-                    theones_clean.append(theones[d-1])
-            theones_clean.append(theones[-1])
-            
-            return theones_clean
-                
-                
-            
-        
-        def yx(event):
-            
-            self.keepline = []
-            "Takes the coordinates of the mouse when you click the mouse"
-            global lastx, lasty
-           
-            self.outercoords = np.asarray(self.outercoords,dtype=int)
-            self.outercoords = the_smoother(self.outercoords)
-            self.template_selection = np.zeros((np.max(self.imlocs[:,3]),np.max(self.imlocs[:,2])))
-            for coord in self.outercoords:
-                self.template_selection[coord[1],coord[0]] = 1
-            
-            # with open('E:\\PhD\\exps\\expMapping\\sillytest.pickle', 'wb') as handle:
-            #     pickle.dump([self.template_selection,self.outercoords],handle,protocol=pickle.HIGHEST_PROTOCOL)
+    def display_hyperedges(self):
+        self.hyperedge_preparation()
+        self.display_images(self.edge_images)
+        self.display_overlapping_hyperedges()
 
-            flinexy = get_coords_first_last_point(self.outercoords[0], self.outercoords[-1])
-            for cd in range(len(flinexy)):
-                self.template_selection[flinexy[cd][0],flinexy[cd][1]] = 1
-            
-            
-            for line in range(self.template_selection.shape[0]):
-                if 1 in self.template_selection[line]:
-                    theones = np.where(self.template_selection[line] == 1)[0]
-                    try: 
-                        theones = clean_theones(theones)
-                    except TypeError:
-                        pass                    
-                    for j in range(len(theones)):
-                        if is_odd(j):
-                            pass
-                        else:
-                            try:
-                                if 0 not in np.max(self.template_selection[0:line+1,theones[j]+1:theones[j+1]],0) and 0 not in np.max(self.template_selection[line::,theones[j]+1:theones[j+1]],0):
-                                    self.template_selection[line,theones[j]:theones[j+1]] = 1
-                            except IndexError:
-                                pass
-                            except ValueError:
-                                pass
 
-            for ix in range(len(self.imlocs)):
-                tly,tlx,bry,brx = self.imlocs[ix]
-                if 1 in self.template_selection[tlx:brx,tly:bry]:
-                    self.rectangles.append(self.c.create_rectangle(tly,tlx,bry,brx, outline='red',width=self.rectanglewidth,tags = ix))
-                    self.selected_images.append(ix)
-                    zetag = int(self.c.gettags(self.imagex[ix])[0])
-                    
-                        
-                        
-            ### MULTI SELECTIE WERKT NOG NIET....
-                
-            lastx, lasty = None, None
-            for tagitem in self.c.gettags('keepline'):
-                if 'keepline' in tagitem:
-                    self.c.delete(tagitem)
-            
-        
-            
-            
-            
-            
-        self.c.bind("<Shift-Button-1>", xy)
-        self.c.bind("<Shift-B1-Motion>", addLine)
-        self.c.bind("<Shift-ButtonRelease-1>", yx)
-        # self.c.bind("<Button-1>", deselect_lasso)
-        
-        
-    def goto_map(self):
-         if len(self.selected_images) == 1:
-            im_tag = self.c.gettags(self.imagex[self.selected_images[0]])
-            im_tag = int(float(im_tag[0]))
-            maploc = np.where(self.zearray_reduced==im_tag)
-            final_posx = (self.imsize + self.image_distance)*maploc[1]
-            final_posy = (self.imsize + self.image_distance)*maploc[0]
-            event_custom = {"x":final_posx, "y":final_posy}
-            self.update_map(event_custom)
-            
-    def make_minimap(self):
-        self.c.unbind("<ButtonRelease-1>")
-        self.c.unbind("<B1-Motion>")
-        self.c.unbind("<Shift-Button-1>")
-        self.c.unbind("<Shift-B1-Motion>")
-        self.c.unbind("<Shift-ButtonRelease-1>")
-        self.c.unbind("<Button-1>")
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'creating macromap')
-        if len(self.zearray_reduced) == 0:        
-            self.communication_label.configure(text='Calculate image map first.')
-            self.communication_label['background'] = '#99CCFF'
-            self.communication_label.update_idletasks()
-        else:
-            with h5py.File(self.hdf_path, 'r') as hdf:
-                self.imagex = []
-                self.c.delete("all")
-    
-                try: #### this fixes a memory leak by deleting currently loaded images in the memory.
-                    	for uut in range(0,len(self.my_img)):
-                    			self.my_img[uut].destroy()
-                except AttributeError:
-                    	pass
-                self.my_img = []
-    
-                self.minimap = np.zeros((self.num_im_col,self.num_im_row),dtype='int') -1
-                row_ints = int(self.zearray_reduced.shape[0] / self.num_im_col)
-                col_ints = int(self.zearray_reduced.shape[1] / self.num_im_row)
-                Q_embed = np.asarray(np.where(self.zearray_reduced>-1)).T
-                for i in range(self.num_im_col):
-                    for j in range(self.num_im_row):                    
-                        d_to_mid = np.argmin(distance.cdist(np.array([[i*row_ints,j*col_ints]]),Q_embed, 'euclidean'))
-                        try:
-                            cur_im = int(self.zearray_reduced[Q_embed[d_to_mid][0],Q_embed[d_to_mid][1]])
-                            Q_embed[d_to_mid] = np.array([len(self.features)*2,len(self.features)*2])
-                            self.minimap[i,j] = int(cur_im)
-                        except IndexError:
-                            pass    
-                        
-                count_im_in_c = 0
-                for j in range(self.minimap.shape[0]):
-                    for k in range(self.minimap.shape[1]):
-                        if self.minimap[j,k] > -1:
-                            load = Image.fromarray(np.array(hdf.get('thumbnails')[self.minimap[j,k]],dtype='uint8'))
-                            # load = Image.open(self.im_list[self.minimap[j,k]])
-                            # try:
-                            #     for orientation in ExifTags.TAGS.keys():
-                            #         if ExifTags.TAGS[orientation]=='Orientation':
-                            #             break
-                            #     exif=dict(load._getexif().items())
-                            
-                            #     if exif[orientation] == 3:
-                            #         load=load.rotate(180, expand=True)
-                            #     elif exif[orientation] == 6:
-                            #         load=load.rotate(270, expand=True)
-                            #     elif exif[orientation] == 8:
-                            #         load=load.rotate(90, expand=True)
-                            # except AttributeError:
-                            #     pass
-                            # except KeyError:
-                            #     pass
-                            # load = load.resize((self.imsize,self.imsize))
-                            render = ImageTk.PhotoImage(load)         
-                            self.my_img.append([])
-                            self.my_img[count_im_in_c] = Label(self.c,background='#555555')
-                            self.my_img[count_im_in_c].image = render                      
-                            row_ = j 
-                            column_ = k 
-                            self.imagex.append(self.c.create_image(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2), image = render, tags =self.minimap[j,k]))
-                            #self.c.update()
-                            count_im_in_c += 1
-            self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+str(self.minimap))
-            self.c['scrollregion']=self.c.bbox("all")
-            # self.c.xview_moveto(cur_x * (self.imsize+ self.image_distance))
-            # self.c.yview_moveto(cur_y * (self.imsize+ self.image_distance))
-            self.c.update()
-            # self.c.bind("<Button-1>", self.click_select)
-            self.c.bind("<Shift-Button-1>", self.shift_click_select)
-            self.c.bind("<Control-Button-1>", self.ctrl_click_select)
-            # self.c.bind('<Double-Button-1>', self.open_image3)
-            self.c.bind('<Shift-MouseWheel>', self._on_shiftmousewheel)
-            
-    def minimap_zoom(self,event):
-        ##you zoom in on the minimap on the selected image.
-        ##it will find the distance of the furthest neighbouring minimap image of the selected image
-        ##then it will create a new minimap by displaying all images between the selected image
-        ##and all the images within this distance. 
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'zooming minimap')
-        evex = self.c.canvasx(event.x)
-        evey = self.c.canvasy(event.y)
-        x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1
-        y_num = math.ceil((evey)/(self.imsize + self.image_distance))-1
-        self.im_numX = x_num + self.num_im_row*(y_num) 
-        #print('imnum',self.im_numX,'xnum',x_num,'ynum',y_num,'numimrow',self.num_im_row)
-        row_ = math.floor(self.im_numX/self.num_im_row)
-        column_ = self.im_numX%self.num_im_row
-        # im_tag = self.c.gettags(self.imagex[im_num])
-        # im_tag = int(float(im_tag[0]))
-        #this def finds the furthest 
-        def get_im_pos(positions,minimap):
-            image_positions = []
-            image_numbers = []
-            
-            im_tag = self.c.gettags(self.imagex[self.im_numX])
-            im_tag = int(float(im_tag[0]))
-            self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+str(im_tag))
-            start_im_position = np.asarray(np.where(self.zearray_reduced == im_tag)).squeeze().T
-           
-            for position in positions:
-                if position == 'left':
-                    im_num = int(self.c.gettags(self.imagex[self.im_numX-1])[0])
-                elif position == 'right':
-                    im_num = int(self.c.gettags(self.imagex[self.im_numX+1])[0])
-                elif position == 'top':
-                    im_num = int(self.c.gettags(self.imagex[self.im_numX-self.num_im_row])[0])
-                elif position == 'bottom':
-                    im_num = int(self.c.gettags(self.imagex[self.im_numX+self.num_im_row])[0])
-                image_positions.append(np.asarray(np.where(self.zearray_reduced == im_num)).squeeze().T)
-                image_numbers.append(im_num)
-           
-            image_positions = np.asarray(image_positions,dtype='int')
-            image_range = int(np.max(distance.cdist(np.array([start_im_position]),image_positions, 'euclidean')))
-            i_range = np.array([start_im_position[0]-image_range,start_im_position[0]+image_range])
-            i_range[i_range < 0] = 0
-            i_range[i_range > self.zearray_reduced.shape[0]] = self.zearray_reduced.shape[0]
-            j_range = np.array([start_im_position[1]-image_range,start_im_position[1]+image_range])
-            j_range[j_range < 0] = 0
-            j_range[j_range > self.zearray_reduced.shape[1]] = self.zearray_reduced.shape[1]
-          
-            new_map_area = self.zearray_reduced[i_range[0]:i_range[1],j_range[0]:j_range[1]]
-            
-            new_minimap = np.zeros((self.num_im_col,self.num_im_row),dtype='int') -1
-            row_ints = int(new_map_area.shape[0] / self.num_im_col)
-            col_ints = int(new_map_area.shape[1] / self.num_im_row)
-            Q_embed = np.asarray(np.where(new_map_area>-1)).T
-            
-            #new_minimap[int(self.num_im_col/2),int(self.num_im_row/2)] = im_tag
-            
-            for i in range(self.num_im_col):
-                for j in range(self.num_im_row):                    
-                    d_to_mid = np.argmin(distance.cdist(np.array([[i*row_ints,j*col_ints]]),Q_embed, 'euclidean'))
-                    try:
-                        cur_im = int(new_map_area[Q_embed[d_to_mid][0],Q_embed[d_to_mid][1]])
-                        Q_embed[d_to_mid] = np.array([len(self.features)*2,len(self.features)*2])
-                        # if new_minimap[i,j] == -1:
-                        #     new_minimap[i,j] = int(cur_im)
-                        new_minimap[i,j] = int(cur_im)
-                    except IndexError:
-                        pass
-                        
-            
-            return new_minimap,image_numbers,start_im_position
-        
-        
-       
-            
-            
-        if x_num == self.num_im_row:
-            if y_num == 0:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['left','bottom'],self.minimap)
-            elif self.im_numX > len(self.imagex)-self.num_im_row:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['left','top'],self.minimap)
-            else:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['left','top','bottom'],self.minimap)
-                
-        elif x_num == 0:
-            if y_num == 0:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['right','bottom'],self.minimap)
-            elif self.im_numX > len(self.imagex)-self.num_im_row:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['right','top'],self.minimap)
-            else:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['right','top','bottom'],self.minimap)
-        else:
-            if y_num == 0:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['left','right','bottom'],self.minimap)                                
-            elif self.im_numX > len(self.imagex)-self.num_im_row:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['left','right','top'],self.minimap)                
-            else:
-                self.minimap,image_numbers,start_im_position = get_im_pos(['left','right','top','bottom'],self.minimap)
-        
-        
-        if np.count_nonzero(self.minimap+1) < self.num_im_row*self.num_im_col:            
-            im_tag = self.c.gettags(self.imagex[self.im_numX])
-            im_tag = int(float(im_tag[0]))
-            ball_pos = np.where(self.zearray_reduced == im_tag)
-           
-            final_posy = ball_pos[0]*(self.imsize + self.image_distance)
-            final_posx = ball_pos[1]*(self.imsize + self.image_distance)
-            
-            event_custom = {"x":final_posx, "y":final_posy}
-            print('and now?')
-            self.c.unbind("<Button-1>")
-            self.c.unbind("<Shift-Button-1>")
-            self.c.unbind("<Control-Button-1>")
-            self.c.unbind('<Double-Button-1>')
-            self.c.unbind('<Shift-MouseWheel>')
-            self.map_select_lasso()
-            self.update_map(event_custom)
-        else:
-            print('going to main map')
-
-            self.c.delete("all")
-    
-            self.imagex = []
-            #self.c.create_rectangle(final_posx - self.imsize/2,final_posy - self.imsize/2,final_posx + self.imsize/2,final_posy+self.imsize/2, outline='maroon1',width=self.rectanglewidth)
-            #self.c.delete("all")
-            try: #### this fixes a memory leak by deleting currently loaded images in the memory.
-                	for uut in range(0,len(self.my_img)):
-                			self.my_img[uut].destroy()
-            except AttributeError:
-                pass
-            self.my_img = []
-            count_im_in_c = 0
-            with h5py.File(self.hdf_path, 'r') as hdf:
-                for j in range(self.minimap.shape[0]):
-                    for k in range(self.minimap.shape[1]):
-                        if self.minimap[j,k] > -1:
-                            load = Image.fromarray(np.array(hdf.get('thumbnails')[self.minimap[j,k]],dtype='uint8'))
-                            # load = Image.open(self.im_list[self.minimap[j,k]])
-                            # try:
-                            #     for orientation in ExifTags.TAGS.keys():
-                            #         if ExifTags.TAGS[orientation]=='Orientation':
-                            #             break
-                            #     exif=dict(load._getexif().items())
-                            
-                            #     if exif[orientation] == 3:
-                            #         load=load.rotate(180, expand=True)
-                            #     elif exif[orientation] == 6:
-                            #         load=load.rotate(270, expand=True)
-                            #     elif exif[orientation] == 8:
-                            #         load=load.rotate(90, expand=True)
-                            # except AttributeError:
-                            #     pass
-                            # except KeyError:
-                            #     pass
-                            # load = load.resize((self.imsize,self.imsize))
-                            render = ImageTk.PhotoImage(load)
-                            self.my_img.append([])
-                            self.my_img[count_im_in_c] = Label(self.c,background='#555555')
-                            self.my_img[count_im_in_c].image = render                      
-                            row_ = j 
-                            column_ = k 
-                            self.imagex.append(self.c.create_image(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2), image = render, tags =self.minimap[j,k]))
-                            #self.c.update()
-                            count_im_in_c += 1
-                self.c['scrollregion']=self.c.bbox("all")
-                # self.c.xview_moveto(cur_x * (self.imsize+ self.image_distance))
-                # self.c.yview_moveto(cur_y * (self.imsize+ self.image_distance))
-                #self.c.update()
-    
-    def _on_shiftmousewheel(self, event):
-       
-        if event.delta > 0:
-            self.minimap_zoom(event)
-        
     # function to sort clusters based on a bucket. Average feature vector for 
     # each cluster correlated with average feature vector of bucket. 
     def sorting_clusters(self):
