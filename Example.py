@@ -1,9 +1,15 @@
 import numpy as np
-from hdf5_saver import HDF5Saver
+import timm
+import numpy as np
+import glob
+import re
+from feature_extractor import FeatureExtractor
+
+from HyperGallerySaveFileMaker import HDF5Saver
 
 
 # Initialize the saver with your HDF5 file name
-saver = HDF5Saver('your_data.h5')
+saver = HDF5Saver('20240918_cbp_session.h5')
 
 # Assume you have the following data
 file_list = ['image1.jpg', 'image2.jpg', 'image3.jpg']

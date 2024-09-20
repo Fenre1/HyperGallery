@@ -438,7 +438,8 @@ class Application(Frame,object):
         self.c = Canvas(bg='#666666',bd=0, scrollregion=(0, 0, 0, 500), width =self.screen_width, height =self.screen_height) #canvas size
         yscrollbar = Scrollbar(orient="vertical", command=self.c.yview)
         xscrollbar = Scrollbar(orient="horizontal", command=self.c.xview)        
-        
+        self.c.my_tag = 'c'
+
         self.c.place(x = 0, y=300)
         #yscrollbar.config(command=self.c.yview)
         #xscrollbar.config(command=self.c.xview)
@@ -575,19 +576,50 @@ class Application(Frame,object):
             self.evey1 = self.c.canvasy(event.y)
     
     def select_image(self, event):
-        self.c.delete('rect_tag')  # assuming all rectangles have 'rect_tag'
-        evex = self.c.canvasx(event.x)
-        evey = self.c.canvasy(event.y)
-        x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1
-        y_num = math.ceil((evey)/(self.imsize + self.image_distance))
-        self.im_numX = x_num + self.num_im_row*(y_num-1) 
-        self.selected_images = [self.im_numX]
-        row_ = math.floor(self.im_numX/self.num_im_row)
-        column_ = self.im_numX%self.num_im_row
-        if len(self.imagex) >= self.im_numX+1:
-            rect = self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='red',width=self.rectanglewidth,tags = ('rect_tag', self.im_numX))
-            self.rectangles = [rect]        
+        canvas = event.widget
+        evex = canvas.canvasx(event.x)
+        evey = canvas.canvasy(event.y)
         
+        # Traverse up to find the canvas
+        while not isinstance(canvas, Canvas):
+            canvas = canvas.master
+        # Now you can access the canvas and its tags
+        canvas_tag = getattr(canvas, 'my_tag', None)
+        print(f"Clicked on canvas with tag: {canvas_tag}")
+        item = event.widget.find_overlapping(evex, evey, evex, evey)
+        print(canvas.gettags(item))
+        # if canvas_tag == 'c':
+        #     self.c.delete('rect_tag')
+        #     for canv in self.hyperedge_canvases:
+        #         canv.delete('rect_tag')
+        #     # evex = self.c.canvasx(event.x)
+        #     # evey = self.c.canvasy(event.y)
+        #     x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1
+        #     y_num = math.ceil((evey)/(self.imsize + self.image_distance))
+        #     self.im_numX = x_num + self.num_im_row*(y_num-1) 
+        #     self.selected_images = [self.im_numX]
+        #     row_ = math.floor(self.im_numX/self.num_im_row)
+        #     column_ = self.im_numX%self.num_im_row
+        #     if len(self.imagex) >= self.im_numX+1:
+        #         rect = self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='red',width=self.rectanglewidth,tags = ('rect_tag', self.im_numX))
+        #         self.rectangles = [rect]        
+        if canvas_tag is not None:
+            self.c.delete('rect_tag')
+            for canv in self.hyperedge_canvases:
+                canv.delete('rect_tag')
+            bbox = canvas.bbox(item)
+            
+            # Draw a rectangle around the image to highlight it
+            canvas.create_rectangle(
+                bbox,
+                outline='red',
+                width=2,
+                tags='rect_tag'
+            )
+
+
+
+
     #this allows you to select multiple adjacent images using the shift key + mouse button 1
     def shift_click_select(self,event):
         evex = self.c.canvasx(event.x)
@@ -2694,7 +2726,7 @@ class Application(Frame,object):
         frame.bind('<Configure>', lambda e: self.main_canvas.configure(scrollregion=self.main_canvas.bbox('all')))
         
         # For each overlapping hyperedge, create a canvas and display images
-        for hyperedge in self.overlapping_hyperedges:
+        for he_id, hyperedge in enumerate(self.overlapping_hyperedges):
             # Label for the hyperedge
             label = Label(frame, text=f"Hyperedge: {hyperedge}", bg='#555555', fg='white', font=('Arial', 14))
             label.pack(fill=X, padx=10, pady=5)
@@ -2702,11 +2734,11 @@ class Application(Frame,object):
             # Frame to hold the canvas and its scrollbar
             canvas_frame = Frame(frame)
             canvas_frame.pack(padx=10, pady=5, fill=BOTH, expand=TRUE)
-        
+
             # Canvas for the hyperedge images
             hyperedge_canvas = Canvas(canvas_frame, bg='#555555')
             hyperedge_canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
-        
+            hyperedge_canvas.my_tag = he_id
             # Vertical scrollbar for the hyperedge canvas
             v_scrollbar = Scrollbar(canvas_frame, orient=VERTICAL, command=hyperedge_canvas.yview)
             v_scrollbar.pack(side=RIGHT, fill=Y)
@@ -2770,34 +2802,9 @@ class Application(Frame,object):
                 column_ = idx % num_im_row
                 x_pos = column_ * (self.imsize + self.image_distance) + (self.imsize / 2)
                 y_pos = row_ * (self.imsize + self.image_distance) + (self.imsize / 2)
-                canvas.create_image(x_pos, y_pos, image=render)
+                canvas.create_image(x_pos, y_pos, image=render,tags=(img_idx))
                 # Keep a reference to prevent garbage collection
                 canvas.image_refs.append(render)
-
-    def display_images_on_frame(self, frame, image_indices):
-        # Initialize a list to store image references
-        if not hasattr(frame, 'image_refs'):
-            frame.image_refs = []
-        else:
-            frame.image_refs.clear()
-
-        # Number of images per row based on the frame width
-        frame_width = 800  # Adjust as needed or get dynamically
-        num_im_row = frame_width // (self.imsize + self.image_distance)
-
-        # Load and display images
-        with h5py.File(self.hdf_path, 'r') as hdf:
-            for idx, img_idx in enumerate(image_indices):
-                load = Image.fromarray(np.array(hdf.get('thumbnail_images')[img_idx], dtype='uint8'))
-                render = ImageTk.PhotoImage(load)
-
-                row_ = idx // num_im_row
-                column_ = idx % num_im_row
-
-                label = Label(frame, image=render, bg='#555555')
-                label.grid(row=row_, column=column_, padx=self.image_distance//2, pady=self.image_distance//2)
-                # Keep a reference to prevent garbage collection
-                frame.image_refs.append(render)
 
 
 
@@ -3537,250 +3544,6 @@ class Application(Frame,object):
                 self.metadata_selection_listbox.insert(END, item)
                 
                 
-                
-#     def create_sankey(self):
-#         def sankey2(left, right, leftWeight=None, rightWeight=None, colorDict=None,
-#                    leftLabels=None, rightLabels=None, aspect=4, rightColor=False,
-#                    fontsize=8, figureName=None, closePlot=False):
-#             '''
-#             Make Sankey Diagram showing flow from left-->right
-#             Inputs:
-#                 left = NumPy array of object labels on the left of the diagram
-#                 right = NumPy array of corresponding labels on the right of the diagram
-#                     len(right) == len(left)
-#                 leftWeight = NumPy array of weights for each strip starting from the
-#                     left of the diagram, if not specified 1 is assigned
-#                 rightWeight = NumPy array of weights for each strip starting from the
-#                     right of the diagram, if not specified the corresponding leftWeight
-#                     is assigned
-#                 colorDict = Dictionary of colors to use for each label
-#                     {'label':'color'}
-#                 leftLabels = order of the left labels in the diagram
-#                 rightLabels = order of the right labels in the diagram
-#                 aspect = vertical extent of the diagram in units of horizontal extent
-#                 rightColor = If true, each strip in the diagram will be be colored
-#                             according to its left label
-#             Ouput:
-#                 None
-#             '''
-#             if leftWeight is None:
-#                 leftWeight = []
-#             if rightWeight is None:
-#                 rightWeight = []
-#             if leftLabels is None:
-#                 leftLabels = []
-#             if rightLabels is None:
-#                 rightLabels = []
-#             # Check weights
-#             if len(leftWeight) == 0:
-#                 leftWeight = np.ones(len(left))
-        
-#             if len(rightWeight) == 0:
-#                 rightWeight = leftWeight
-            
-#             figuur = plt.Figure()
-#             a = figuur.add_subplot(111)
-
-#             plt.rc('text', usetex=False)
-#             plt.rc('font', family='serif')
-        
-#             # Create Dataframe
-#             if isinstance(left, pd.Series):
-#                 left = left.reset_index(drop=True)
-#             if isinstance(right, pd.Series):
-#                 right = right.reset_index(drop=True)
-#             dataFrame = pd.DataFrame({'left': left, 'right': right, 'leftWeight': leftWeight,
-#                                       'rightWeight': rightWeight}, index=range(len(left)))
-        
-#             if len(dataFrame[(dataFrame.left.isnull()) | (dataFrame.right.isnull())]):
-#                 raise NullsInFrame('Sankey graph does not support null values.')
-        
-#             # Identify all labels that appear 'left' or 'right'
-#             allLabels = pd.Series(np.r_[dataFrame.left.unique(), dataFrame.right.unique()]).unique()
-        
-#             # Identify left labels
-#             if len(leftLabels) == 0:
-#                 leftLabels = pd.Series(dataFrame.left.unique()).unique()
-#             else:
-#                 check_data_matches_labels(leftLabels, dataFrame['left'], 'left')
-        
-#             # Identify right labels
-#             if len(rightLabels) == 0:
-#                 rightLabels = pd.Series(dataFrame.right.unique()).unique()
-#             else:
-#                 check_data_matches_labels(leftLabels, dataFrame['right'], 'right')
-#             # If no colorDict given, make one
-#             if colorDict is None:
-#                 colorDict = {}
-#                 palette = "hls"
-#                 colorPalette = sns.color_palette(palette, len(allLabels))
-#                 for i, label in enumerate(allLabels):
-#                     colorDict[label] = colorPalette[i]
-#             else:
-#                 missing = [label for label in allLabels if label not in colorDict.keys()]
-#                 if missing:
-#                     msg = "The colorDict parameter is missing values for the following labels : "
-#                     msg += '{}'.format(', '.join(missing))
-#                     raise ValueError(msg)
-        
-#             # Determine widths of individual strips
-#             ns_l = defaultdict()
-#             ns_r = defaultdict()
-#             for leftLabel in leftLabels:
-#                 leftDict = {}
-#                 rightDict = {}
-#                 for rightLabel in rightLabels:
-#                     leftDict[rightLabel] = dataFrame[(dataFrame.left == leftLabel) & (dataFrame.right == rightLabel)].leftWeight.sum()
-#                     rightDict[rightLabel] = dataFrame[(dataFrame.left == leftLabel) & (dataFrame.right == rightLabel)].rightWeight.sum()
-#                 ns_l[leftLabel] = leftDict
-#                 ns_r[leftLabel] = rightDict
-        
-#             # Determine positions of left label patches and total widths
-#             leftWidths = defaultdict()
-#             for i, leftLabel in enumerate(leftLabels):
-#                 myD = {}
-#                 myD['left'] = dataFrame[dataFrame.left == leftLabel].leftWeight.sum()
-#                 if i == 0:
-#                     myD['bottom'] = 0
-#                     myD['top'] = myD['left']
-#                 else:
-#                     myD['bottom'] = leftWidths[leftLabels[i - 1]]['top'] + 0.02 * dataFrame.leftWeight.sum()
-#                     myD['top'] = myD['bottom'] + myD['left']
-#                     topEdge = myD['top']
-#                 leftWidths[leftLabel] = myD
-        
-#             # Determine positions of right label patches and total widths
-#             rightWidths = defaultdict()
-#             for i, rightLabel in enumerate(rightLabels):
-#                 myD = {}
-#                 myD['right'] = dataFrame[dataFrame.right == rightLabel].rightWeight.sum()
-#                 if i == 0:
-#                     myD['bottom'] = 0
-#                     myD['top'] = myD['right']
-#                 else:
-#                     myD['bottom'] = rightWidths[rightLabels[i - 1]]['top'] + 0.2 * dataFrame.rightWeight.sum()
-#                     myD['top'] = myD['bottom'] + myD['right']
-#                     topEdge = myD['top']
-#                 rightWidths[rightLabel] = myD
-        
-#             # Total vertical extent of diagram
-#             xMax = topEdge / aspect
-        
-#             # Draw vertical bars on left and right of each  label's section & print label
-#             for leftLabel in leftLabels:
-#                 plt.fill_between(
-#                     [-0.02 * xMax, 0],
-#                     2 * [leftWidths[leftLabel]['bottom']],
-#                     2 * [leftWidths[leftLabel]['bottom'] + leftWidths[leftLabel]['left']],
-#                     color=colorDict[leftLabel],
-#                     alpha=0.99
-#                 )
-#                 plt.text(
-#                     -0.05 * xMax,
-#                     leftWidths[leftLabel]['bottom'] + 0.5 * leftWidths[leftLabel]['left'],
-#                     leftLabel,
-#                     {'ha': 'right', 'va': 'center'},
-#                     fontsize=fontsize,
-#                     color='#FFFFFF'
-#                 )
-#             for rightLabel in rightLabels:
-#                 plt.fill_between(
-#                     [xMax, 1.02 * xMax], 2 * [rightWidths[rightLabel]['bottom']],
-#                     2 * [rightWidths[rightLabel]['bottom'] + rightWidths[rightLabel]['right']],
-#                     color=colorDict[rightLabel],
-#                     alpha=0.99
-#                 )
-#                 plt.text(
-#                     1.05 * xMax,
-#                     rightWidths[rightLabel]['bottom'] + 0.5 * rightWidths[rightLabel]['right'],
-#                     rightLabel,
-#                     {'ha': 'left', 'va': 'center'},
-#                     fontsize=fontsize,
-#                     color='#FFFFFF'
-#                 )
-        
-#             # Plot strips
-#             for leftLabel in leftLabels:
-#                 for rightLabel in rightLabels:
-#                     labelColor = leftLabel
-#                     if rightColor:
-#                         labelColor = rightLabel
-#                     if len(dataFrame[(dataFrame.left == leftLabel) & (dataFrame.right == rightLabel)]) > 0:
-#                         # Create array of y values for each strip, half at left value,
-#                         # half at right, convolve
-#                         ys_d = np.array(50 * [leftWidths[leftLabel]['bottom']] + 50 * [rightWidths[rightLabel]['bottom']])
-#                         ys_d = np.convolve(ys_d, 0.05 * np.ones(20), mode='valid')
-#                         ys_d = np.convolve(ys_d, 0.05 * np.ones(20), mode='valid')
-#                         ys_u = np.array(50 * [leftWidths[leftLabel]['bottom'] + ns_l[leftLabel][rightLabel]] + 50 * [rightWidths[rightLabel]['bottom'] + ns_r[leftLabel][rightLabel]])
-#                         ys_u = np.convolve(ys_u, 0.05 * np.ones(20), mode='valid')
-#                         ys_u = np.convolve(ys_u, 0.05 * np.ones(20), mode='valid')
-        
-#                         # Update bottom edges at each label so next strip starts at the right place
-#                         leftWidths[leftLabel]['bottom'] += ns_l[leftLabel][rightLabel]
-#                         rightWidths[rightLabel]['bottom'] += ns_r[leftLabel][rightLabel]
-#                         plt.fill_between(
-#                             np.linspace(0, xMax, len(ys_d)), ys_d, ys_u, alpha=0.65,
-#                             color=colorDict[labelColor]
-#                         )
-#             plt.gca().axis('off')
-#             plt.gcf().set_size_inches(6, 6)
-#             self.bufsankey = io.BytesIO()
-#             if figureName != None:
-# #                plt.savefig("{}.png".format(figureName), bbox_inches='tight', dpi=150,facecolor='#555555')
-#                 plt.savefig(self.bufsankey, format='png', bbox_inches='tight', dpi=150,facecolor='#555555')
-
-#             plt.close()
-
-#         #this uses the def sankey2 to create sankey
-#         def pd_for_sankey(thedict):
-#             mah_list = []       
-#             keyslist = []
-#             for key in thedict:
-#                 mah_list.append(np.array(thedict[key]))
-#                 keyslist.append(key)
-#             #themax = get_longest(mah_list)
-#             leftWeight = []
-#             rightWeight  = []
-#             bucket1 = []
-#             bucket2 = []
-#             for t in range(0,len(mah_list)):
-#                 for u in range(len(mah_list)):
-#                     if t == u:
-#                         pass
-#                     else:
-#                         if len(mah_list[t]) == 0:
-#                             pass
-#                         elif len(list(set(mah_list[t]).intersection(mah_list[u]))) == 0:
-#                             pass
-#                         else:
-#                             leftWeight.append(len(mah_list[t]))
-#                             rightWeight.append(len(list(set(mah_list[t]).intersection(mah_list[u]))))
-#                             bucket1.append(keyslist[t])
-#                             bucket2.append(keyslist[u])
-#             for_pd = [bucket1,bucket2,rightWeight,leftWeight]
-                
-#             the_df = pd.DataFrame.from_records(for_pd,index=None)
-#             the_df = pd.DataFrame.transpose(the_df)
-#             return the_df
-#         the_df = pd_for_sankey(self.theBuckets)
-#         sankey2(left=the_df[0], right=the_df[1], leftWeight=the_df[3], rightWeight=the_df[2], colorDict = None,aspect=20,fontsize=12,figureName='temp_for_sankey')
-#         self.frame = Frame(self.newWindow)
-#         self.frame.place(x=0,y=0)
-#         self.canvas = Canvas(self.newWindow,bg='#555555',bd=0, width =self.screen_width-500, height =self.screen_height+400) #canvas size
-#         self.canvas.place(x = 600, y=0)
-# #        load_sankey = Image.open('temp_for_sankey.png')
-#         load_sankey = Image.open(self.bufsankey)
-#         load_sankey = load_sankey.resize((self.screen_width-600,self.screen_height+300))
-#         render_sankey = ImageTk.PhotoImage(load_sankey)
-#         my_img = ttk.Label(self,background='#555555')
-#         my_img.image = render_sankey
-#         #image_.append(my_img)
-#         self.canvas.create_image(int((self.screen_width-500)/2),int((self.screen_height+300)/2),image = render_sankey)
-        
-    
-        
-    
-    
 
     def client_exit(self):
         exit()
