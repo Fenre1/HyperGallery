@@ -579,88 +579,92 @@ class Application(Frame,object):
         canvas = event.widget
         evex = canvas.canvasx(event.x)
         evey = canvas.canvasy(event.y)
-        
+        self.selected_images = []
         # Traverse up to find the canvas
         while not isinstance(canvas, Canvas):
             canvas = canvas.master
         # Now you can access the canvas and its tags
-        canvas_tag = getattr(canvas, 'my_tag', None)
-        print(f"Clicked on canvas with tag: {canvas_tag}")
-        item = event.widget.find_overlapping(evex, evey, evex, evey)
-        print(canvas.gettags(item))
-        # if canvas_tag == 'c':
-        #     self.c.delete('rect_tag')
-        #     for canv in self.hyperedge_canvases:
-        #         canv.delete('rect_tag')
-        #     # evex = self.c.canvasx(event.x)
-        #     # evey = self.c.canvasy(event.y)
-        #     x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1
-        #     y_num = math.ceil((evey)/(self.imsize + self.image_distance))
-        #     self.im_numX = x_num + self.num_im_row*(y_num-1) 
-        #     self.selected_images = [self.im_numX]
-        #     row_ = math.floor(self.im_numX/self.num_im_row)
-        #     column_ = self.im_numX%self.num_im_row
-        #     if len(self.imagex) >= self.im_numX+1:
-        #         rect = self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='red',width=self.rectanglewidth,tags = ('rect_tag', self.im_numX))
-        #         self.rectangles = [rect]        
-        if canvas_tag is not None:
+        self.canvas_tag = getattr(canvas, 'my_tag', None)
+        self.item = event.widget.find_overlapping(evex, evey, evex, evey)
+        
+        if self.canvas_tag is not None:
             self.c.delete('rect_tag')
             for canv in self.hyperedge_canvases:
                 canv.delete('rect_tag')
-            bbox = canvas.bbox(item)
+            bbox = canvas.bbox(self.item)
             
             # Draw a rectangle around the image to highlight it
-            canvas.create_rectangle(
+            rect = canvas.create_rectangle(
                 bbox,
                 outline='red',
                 width=2,
                 tags='rect_tag'
             )
+            self.rectangles = [rect]
+            self.selected_images.append(canvas.gettags(self.item)[0])
 
-
-
-
-    #this allows you to select multiple adjacent images using the shift key + mouse button 1
+    # this allows you to select multiple adjacent images using the shift key + mouse button 1
     def shift_click_select(self,event):
-        evex = self.c.canvasx(event.x)
-        evey = self.c.canvasy(event.y)
-        x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1
-        y_num = math.ceil((evey)/(self.imsize + self.image_distance))
-        self.im_numY = x_num + self.num_im_row*(y_num-1)
-
-        for q in range(0,len(self.rectangles)):
-            self.c.delete(self.rectangles[q])
-        self.rectangles = []
-        self.selected_images = []
-        im_selected = np.sort(np.array([self.im_numY,self.im_numX]))
-        for p in range(im_selected[0],im_selected[1]+1):
-            row_ = math.floor(p/self.num_im_row)
-            column_ = p%self.num_im_row
-            self.selected_images.append(p)
-            self.rectangles.append(self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='red',width=self.rectanglewidth,tags = ('rect_tag',p)))
+        canvas = event.widget
+        evex = canvas.canvasx(event.x)
+        evey = canvas.canvasy(event.y)
         
-    
+        # Traverse up to find the canvas
+        while not isinstance(canvas, Canvas):
+            canvas = canvas.master
+        # Now you can access the canvas and its tags
+        self.canvas_tag2 = getattr(canvas, 'my_tag', None)
+        self.item2 = event.widget.find_overlapping(evex, evey, evex, evey)
+        
+        if self.canvas_tag2 == self.canvas_tag:
+            self.selected_images = []
+            self.rectangles = []
+            maxit = np.max([self.item[0],self.item2[0]]) + 1
+            minit = np.min([self.item[0],self.item2[0]])
+            for idx in range(minit,maxit):
+                bbox = canvas.bbox(idx)
+                rect = canvas.create_rectangle(
+                    bbox,
+                    outline='red',
+                    width=2,
+                    tags='rect_tag'
+                )
+                self.rectangles.append(rect)
+                self.selected_images.append(canvas.gettags(idx)[0])
+
     #this function allows you to select multiple non-adjacent images by hold down control + left click
     def ctrl_click_select(self,event):
-        evex = self.c.canvasx(event.x)
-        evey = self.c.canvasy(event.y)
-        x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1
-        y_num = math.ceil((evey)/(self.imsize + self.image_distance))
-        self.im_numX = x_num + self.num_im_row*(y_num-1)
-        row_ = math.floor(self.im_numX/self.num_im_row)
-        column_ = self.im_numX%self.num_im_row
-        current_tags = []
-        
-        if self.im_numX in self.selected_images: 
-            deselect = self.selected_images.index(self.im_numX)
-            self.c.delete(self.rectangles[deselect])
-            #mask = np.ones(len(self.selected_images),dtype=bool)
-            self.selected_images.remove(self.im_numX)
-            self.rectangles.remove(self.rectangles[deselect])
-            #self.selected_images = self.selected_images[mask]
+        canvas = event.widget
+        evex = canvas.canvasx(event.x)
+        evey = canvas.canvasy(event.y)
+        # Traverse up to find the canvas
+        while not isinstance(canvas, Canvas):
+            canvas = canvas.master
+        # Now you can access the canvas and its tags
+        self.canvas_tag = getattr(canvas, 'my_tag', None)
+        self.item = event.widget.find_overlapping(evex, evey, evex, evey)
+        if canvas.gettags(self.item)[0] in self.selected_images:
+            item_to_remove = self.selected_images.index(canvas.gettags(self.item)[0])
+            canvas.delete(self.rectangles[item_to_remove])
+            del self.selected_images[item_to_remove]
+            del self.rectangles[item_to_remove]
+            
         else:
-            self.rectangles.append(self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='red',width=self.rectanglewidth,tags =('rect_tag', self.im_numX)))
-            self.selected_images.append(self.im_numX)
+            self.item = event.widget.find_overlapping(evex, evey, evex, evey)
+            
+            if self.canvas_tag is not None:
+                bbox = canvas.bbox(self.item)
+                
+                # Draw a rectangle around the image to highlight it
+                rect = canvas.create_rectangle(
+                    bbox,
+                    outline='red',
+                    width=2,
+                    tags='rect_tag'
+                )
+                self.rectangles.append(rect)
+                self.selected_images.append(canvas.gettags(self.item)[0])
+
         
     
     def double_click_overview(self,event):
