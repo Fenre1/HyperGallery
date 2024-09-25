@@ -136,6 +136,7 @@ class Application(Frame,object):
         self.meta_data = pd.DataFrame() # DataFrame to hold metadata
         self.selected_edge = None # Currently selected hyperedge
         self.hyperedge_canvases = [] # to store our hyperedge canvases of the second window
+        self.list_of_colors = ['crimson', 'gold', 'royalblue', 'hotpink', 'turqoise', 'purple', 'lime', 'lightyellow' ,'forestgreen','silver']
         #currently available:
             #'resnet18'
             #'resnet152' << prefered option
@@ -523,7 +524,6 @@ class Application(Frame,object):
                 self.selectedcat = []        
         
     def _bound_to_mousewheel(self,event):
-        print(event)            
         self.c.bind_all("<MouseWheel>", self._on_mousewheel)
             
     def _unbound_to_mousewheel(self, event):
@@ -545,13 +545,11 @@ class Application(Frame,object):
                     self.categories.insert(END, item)
     
     def open_image3(self,event):
-        evex = self.c.canvasx(event.x)
-        evey = self.c.canvasy(event.y)
-        x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1
-        y_num = math.ceil((evey)/(self.imsize + self.image_distance))
-        im_num = x_num + self.num_im_row*(y_num-1)
-        im_tag = self.c.gettags(self.imagex[im_num])
-        im_tag = int(float(im_tag[0]))
+        canvas = event.widget
+        evex = canvas.canvasx(event.x)
+        evey = canvas.canvasy(event.y)
+        self.item = canvas.find_overlapping(evex, evey, evex, evey)
+        im_tag = int(canvas.gettags(self.item)[0])
         mijn_plaatje = self.im_list[im_tag]
         webbrowser.open(mijn_plaatje)
 #
@@ -691,27 +689,27 @@ class Application(Frame,object):
         self.c.unbind("<Shift-ButtonRelease-1>")
         # self.c.unbind("<Button-1>")
         
-        try:
-            self.seenX = np.max(self.totimseen)
-            self.totimseen = []
-        except AttributeError:
-            pass
-        except ValueError:
-            if len(self.ccluster) > self.num_im_row*self.num_im_col:
-                   self.seenX = self.num_im_row*self.num_im_col
-            else:
-                self.seenX = len(self.ccluster)
+        # try:
+        #     self.seenX = np.max(self.totimseen)
+        #     self.totimseen = []
+        # except AttributeError:
+        #     pass
+        # except ValueError:
+        #     if len(self.ccluster) > self.num_im_row*self.num_im_col:
+        #            self.seenX = self.num_im_row*self.num_im_col
+        #     else:
+        #         self.seenX = len(self.ccluster)
                 
         if len(cluster) == 0:
             self.communication_label.configure(text='No images to show')
             return
         self.ccluster = cluster
-        if input_origin == 'overview':
-            self.oview = 1
-            # self.bO3["state"] = 'normal'
-        else:
-            self.oview = 0
-            # self.bO3["state"] = 'disabled'
+        # if input_origin == 'overview':
+        #     self.oview = 1
+        #     # self.bO3["state"] = 'normal'
+        # else:
+        #     self.oview = 0
+        #     # self.bO3["state"] = 'disabled'
        
         self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance)) #the total number of images that fit from left to right
 
@@ -745,14 +743,13 @@ class Application(Frame,object):
         x = []
         for ij in range(0,len(self.ccluster)):
             x.append(self.im_list[self.ccluster[ij]])
-
         self.imagex = []
         self.c['scrollregion'] = (0,0,0,math.ceil(len(x)/self.num_im_row)*(self.imsize+self.image_distance))
         self.c.delete("all")
-        self.greentangles = []
-        self.purpletangles = []
-        if self.bucketDisp == 5:
-            self.bucketDisp == 0
+        # self.greentangles = []
+        # self.purpletangles = []
+        # if self.bucketDisp == 5:
+        #     self.bucketDisp == 0
 
             
         
@@ -769,40 +766,47 @@ class Application(Frame,object):
                 #test = np.asarray(hdf.get('thumbnails')[1],dtype='uint8')
                 load = Image.fromarray(np.array(hdf.get('thumbnail_images')[self.ccluster[j]],dtype='uint8'))
                 render = ImageTk.PhotoImage(load)
-                self.my_img.append([])
-                self.my_img[j] = Label(self.c,background='#555555')
-                self.my_img[j].image = render
-                row_ = math.floor(j/self.num_im_row)
-                column_ = j%self.num_im_row
-                self.imagex.append(self.c.create_image(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ (self.imsize / 2), image = render, tags =self.ccluster[j]))
+                self.my_img.append(render)
+                row_ = j // self.num_im_row
+                column_ = j % self.num_im_row
+                x_pos = column_ * (self.imsize + self.image_distance) + (self.imsize / 2)
+                y_pos = row_ * (self.imsize + self.image_distance) + (self.imsize / 2)
+
+
+                # self.my_img.append([])
+                # self.my_img[j] = Label(self.c,background='#555555')
+                # self.my_img[j].image = render
+                # row_ = math.floor(j/self.num_im_row)
+                # column_ = j%self.num_im_row
+                self.imagex.append(self.c.create_image(x_pos,y_pos, image=render, tags=self.ccluster[j]))
                 
                 
 #                self.my_img[j].destroy()
-                if self.bucketDisp != 1:
-                    if int(self.ccluster[j]) in [xx for vv in self.theBuckets.values() for xx in vv]:
-                            self.greentangles.append(self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='cyan2',width=self.rectanglewidth,tags = self.ccluster[j]))                    
-                if self.subcyes == 1:
-                    if int(self.ccluster[j]) in self.sel_im:
-                        self.purpletangles.append(self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='blueviolet',width=self.rectanglewidth,tags = self.ccluster[j]))
-                if self.oview == 1:
-                    txtov = self.c.create_text(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ self.imsize - (self.image_distance/2) ,anchor='nw',fill="white",font="Calibri 8",
-                                       text=str(len(np.where(self.df[:,j]>-1)[0])))
-                    txtbb = self.c.create_rectangle(self.c.bbox(txtov),fill="#666666",outline="");self.c.tag_lower(txtbb,txtov)
-                self.c.update()
-            self.row_ = row_
-            self.column_ = column_
+                # if self.bucketDisp != 1:
+                #     if int(self.ccluster[j]) in [xx for vv in self.theBuckets.values() for xx in vv]:
+                #             self.greentangles.append(self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='cyan2',width=self.rectanglewidth,tags = self.ccluster[j]))                    
+                # if self.subcyes == 1:
+                #     if int(self.ccluster[j]) in self.sel_im:
+                #         self.purpletangles.append(self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='blueviolet',width=self.rectanglewidth,tags = self.ccluster[j]))
+                # if self.oview == 1:
+                #     txtov = self.c.create_text(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ self.imsize - (self.image_distance/2) ,anchor='nw',fill="white",font="Calibri 8",
+                #                        text=str(len(np.where(self.df[:,j]>-1)[0])))
+                #     txtbb = self.c.create_rectangle(self.c.bbox(txtov),fill="#666666",outline="");self.c.tag_lower(txtbb,txtov)
+                # self.c.update()
+            # self.row_ = row_
+            # self.column_ = column_
             
-            if self.ctrlzused == 1: 
-                self.ctrlzused = 0
-            else:
-                self.czcurrent = -1
+        #     if self.ctrlzused == 1: 
+        #         self.ctrlzused = 0
+        #     else:
+        #         self.czcurrent = -1
 
-                if len(self.controlZ) < 10:                
-                    self.controlZ.append(cluster)
-                else:
-                    del self.controlZ[0]
-                    self.controlZ.append(cluster)                    
-        self.subcyes = 0
+        #         if len(self.controlZ) < 10:                
+        #             self.controlZ.append(cluster)
+        #         else:
+        #             del self.controlZ[0]
+        #             self.controlZ.append(cluster)                    
+        # self.subcyes = 0
         
     def _on_mousewheel(self, event):
         self.c.yview_scroll((int(-1*event.delta/120)), "units")
@@ -821,7 +825,6 @@ class Application(Frame,object):
         
     def _on_mousewheel_second_window(self, event):
         # Windows only
-        print("Mouse wheel event in second window")  # For debugging
         event.widget.yview_scroll(int(-1*(event.delta/120)), "units")
         
         
@@ -2693,17 +2696,60 @@ class Application(Frame,object):
 
     def hyperedge_preparation(self):
         """Based on the currently selected hyperedge, determine which other hyperedges need to be shown."""
-        if self.selected_edge is None:            
+        if self.selected_edge is None:
             self.selected_edge = next(iter(self.hyperedges))
+        
+        # Get the images in the selected hyperedge
         self.edge_images = self.hyperedges[self.selected_edge]
+        
         overlapping_hyperedges = set()
         for image_id in self.edge_images:
             hyperedges_of_image = self.image_mapping[image_id]
             overlapping_hyperedges.update(hyperedges_of_image)
-
+        
+        # Remove the selected hyperedge from the set of overlapping hyperedges
         overlapping_hyperedges.discard(self.selected_edge)
-        self.overlapping_hyperedges = overlapping_hyperedges
+        
+        # Prepare a list to store hyperedge data
+        self.overlapping_hyperedges = []
+        edge_ids = []
+        for hyperedge in overlapping_hyperedges:
+            edge_ids.append(hyperedge)
+            images_in_hyperedge = self.hyperedges[hyperedge]
+            overlapping_images = self.edge_images.intersection(images_in_hyperedge)
+            non_overlapping_images = images_in_hyperedge - overlapping_images
+            print(overlapping_images,non_overlapping_images)
+            # Create an ordered list of images: shared images first
+            ordered_images = list(overlapping_images) + list(non_overlapping_images)
+            
+            # Convert the ordered images list to a NumPy array
+            hyperedge_array = np.array(ordered_images, dtype=int)
+            
+            # Append the NumPy array to the list
+            self.overlapping_hyperedges.append(hyperedge_array)
+        
+        # Optionally, sort the arrays by the number of overlapping images (if desired)
+        # self.overlapping_hyperedges = sorted(
+        #     self.overlapping_hyperedges,
+        #     key=lambda x: len(np.intersect1d(x, list(self.edge_images))),
+        #     reverse=True
+        # )
+        sorted_indices = sorted(
+            range(len(self.overlapping_hyperedges)),
+            key=lambda i: len(np.intersect1d(self.overlapping_hyperedges[i], list(self.edge_images))),
+            reverse=True
+        )
+    
+        self.overlapping_hyperedges = [self.overlapping_hyperedges[i] for i in sorted_indices]
+        self.edge_ids = [edge_ids[i] for i in sorted_indices]
+
+        # Store the edge images as a NumPy array
         self.edge_images = np.array(list(self.edge_images), dtype=int)
+        
+        # Optionally, store the edge images as a NumPy array if needed
+
+
+
 
     def display_overlapping_hyperedges(self):
         # Destroy existing widgets in the new window
@@ -2732,7 +2778,7 @@ class Application(Frame,object):
         # For each overlapping hyperedge, create a canvas and display images
         for he_id, hyperedge in enumerate(self.overlapping_hyperedges):
             # Label for the hyperedge
-            label = Label(frame, text=f"Hyperedge: {hyperedge}", bg='#555555', fg='white', font=('Arial', 14))
+            label = Label(frame, text=self.edge_ids[he_id], bg='#555555', fg='white', font=('Arial', 14))
             label.pack(fill=X, padx=10, pady=5)
         
             # Frame to hold the canvas and its scrollbar
@@ -2740,7 +2786,7 @@ class Application(Frame,object):
             canvas_frame.pack(padx=10, pady=5, fill=BOTH, expand=TRUE)
 
             # Canvas for the hyperedge images
-            hyperedge_canvas = Canvas(canvas_frame, bg='#555555')
+            hyperedge_canvas = Canvas(canvas_frame, bg='#555555', width=800, height=600)
             hyperedge_canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
             hyperedge_canvas.my_tag = he_id
             # Vertical scrollbar for the hyperedge canvas
@@ -2748,7 +2794,7 @@ class Application(Frame,object):
             v_scrollbar.pack(side=RIGHT, fill=Y)
         
             hyperedge_canvas.configure(yscrollcommand=v_scrollbar.set)
-        
+            self.list_of_colors
             
             # Bind mouse wheel events to the hyperedge canvas
             hyperedge_canvas.bind('<Enter>', lambda event: event.widget.focus_set())
@@ -2767,12 +2813,15 @@ class Application(Frame,object):
             
             self.hyperedge_canvases.append(hyperedge_canvas)
             # Get image IDs and display them on the inner frame
-            image_ids = self.hyperedges[hyperedge]
+            # image_ids = self.hyperedges[self.edge_ids[he_id]]
+            image_ids = hyperedge
+            print('imgids:',image_ids)
             image_indices = np.array(list(image_ids), dtype=int)
+            print('imgindices:',image_indices)
             # inner_frame = Frame(hyperedge_canvas, bg='#555555')
             # inner_frame.bind('<Configure>', lambda e, canvas=hyperedge_canvas: canvas.configure(scrollregion=canvas.bbox('all')))
             # hyperedge_canvas.create_window((0, 0), window=inner_frame, anchor='nw')
-
+            
             self.display_images_on_canvas(self.hyperedge_canvases[-1], image_indices)
             # self.display_images_on_frame(inner_frame, image_indices)
 
@@ -2781,6 +2830,7 @@ class Application(Frame,object):
 
     def display_images_on_canvas(self, canvas, image_indices):
         # Similar setup as in display_images, but use the provided canvas
+        self.sharetangles = []
         num_im_row = math.floor(800 / (self.imsize + self.image_distance))  # Assuming canvas width is 800
 
         # Prepare the canvas scroll region
@@ -2806,9 +2856,19 @@ class Application(Frame,object):
                 column_ = idx % num_im_row
                 x_pos = column_ * (self.imsize + self.image_distance) + (self.imsize / 2)
                 y_pos = row_ * (self.imsize + self.image_distance) + (self.imsize / 2)
-                canvas.create_image(x_pos, y_pos, image=render,tags=(img_idx))
-                # Keep a reference to prevent garbage collection
+                for_bb = canvas.create_image(x_pos, y_pos, image=render,tags=(img_idx))
                 canvas.image_refs.append(render)
+                if img_idx in self.edge_images:
+                    bbox = canvas.bbox(for_bb)
+            
+                    rect = canvas.create_rectangle(
+                        bbox,
+                        outline='yellow',
+                        width=2,
+                        tags='share_tag'
+                    )
+                    self.sharetangles.append(rect)
+
 
 
 
