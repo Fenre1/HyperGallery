@@ -365,7 +365,16 @@ class Application(Frame,object):
         self.b4['command'] = self.showEdge
         self.b4.place(x=400,y=120)
 
+        #button to show currently selected bucket
+        self.b5 = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.b5['text'] ="Remove image from hyperedge"
+        self.b5.bind('<Button-3>',showbucket_text)        
+        self.b5['command'] = self.remove_selected_image_from_hyperedge
+        self.b5.place(x=400,y=150)
 
+
+
+        
         ### some other stuff ####
         #creates window for statistics and other data
         self.newWindow = Toplevel(self.master)
@@ -2718,7 +2727,6 @@ class Application(Frame,object):
             images_in_hyperedge = self.hyperedges[hyperedge]
             overlapping_images = self.edge_images.intersection(images_in_hyperedge)
             non_overlapping_images = images_in_hyperedge - overlapping_images
-            print(overlapping_images,non_overlapping_images)
             # Create an ordered list of images: shared images first
             ordered_images = list(overlapping_images) + list(non_overlapping_images)
             
@@ -2876,6 +2884,32 @@ class Application(Frame,object):
         self.hyperedge_preparation()
         self.display_images(self.edge_images)
         self.display_overlapping_hyperedges()
+
+    def remove_selected_image_from_hyperedge(self):
+        if self.selected_images == None:
+            return
+        if self.selected_edge == None: 
+            return
+        for i_idx in self.selected_images:
+            self.remove_image_from_hyperedge(self.selected_edge, i_idx)
+
+
+    def remove_image_from_hyperedge(self, hyperedge_name, i_idx):
+        # Remove the image index from the hyperedge set
+        if hyperedge_name in self.hyperedges:
+            self.hyperedges[hyperedge_name].discard(i_idx)  # Use discard to avoid errors if i_idx is not in the set
+
+            # If the hyperedge is now empty, you might want to delete it
+            if len(self.hyperedges[hyperedge_name]) == 0:
+                del self.hyperedges[hyperedge_name]
+
+        # Remove the hyperedge from the image mapping
+        if i_idx in self.image_mapping:
+            self.image_mapping[i_idx].discard(hyperedge_name)
+
+            # If the image mapping for i_idx is now empty, remove the entry
+            if len(self.image_mapping[i_idx]) == 0:
+                del self.image_mapping[i_idx]
 
 
     # function to sort clusters based on a bucket. Average feature vector for 
