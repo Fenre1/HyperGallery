@@ -67,6 +67,12 @@ import time
 import rasterfairy #from 2d point cloud to square grid. Need to change import rasterfairy.prime to import rasterfairy.prime as prime in the rasterfairy.py file. You also need to change np.float to float.
 import bottleneck as bn
 import exifread
+import hypernetx as hnx
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from sklearn.neighbors import NearestNeighbors
+from threading import Timer
 #import clip ## only if model used is clip... 
 
 batch_size  = 8
@@ -119,7 +125,7 @@ class Application(Frame,object):
         # self.neuralnet = 'clip'#determines the neural network used.
         self.subcyes = 0            # is 1 when subclustering, 0 otherwise
         self.tsneclick = 0          #keeps track of creating the square on tsne graph
-        self.x_test = []            # variable for UMAP/TSNE embedding
+        self.umap_features = []            # variable for UMAP/TSNE embedding
         self.wt = 0
         self.selectedcat = []       #needed to make it possible to deselect item in category box
         self.video_cm = []          #in case the user adds videos
@@ -136,7 +142,12 @@ class Application(Frame,object):
         self.meta_data = pd.DataFrame() # DataFrame to hold metadata
         self.selected_edge = None # Currently selected hyperedge
         self.hyperedge_canvases = [] # to store our hyperedge canvases of the second window
+        self.previous_hypergraphs = []
         self.list_of_colors = ['crimson', 'gold', 'royalblue', 'hotpink', 'turqoise', 'purple', 'lime', 'lightyellow' ,'forestgreen','silver']
+        self.text_removes = 0
+        self.previous_visible_points = []
+        self.image_boxes = []
+
         #currently available:
             #'resnet18'
             #'resnet152' << prefered option
@@ -153,7 +164,7 @@ class Application(Frame,object):
         style.map('.',background=[('disabled','#555555'),('active','#777777')], relief=[('!pressed','sunken'),('pressed','raised')])
         style.configure('TNotebook.Tab',background='#555555')
         style.map('TNotebook.Tab',background=[('selected','black')])
-#
+#   
 
 #        style.settings()
 #        tabstyle = ttk.Style()
@@ -372,6 +383,12 @@ class Application(Frame,object):
         self.b5['command'] = self.remove_selected_image_from_hyperedge
         self.b5.place(x=400,y=150)
 
+        #button to show currently selected bucket
+        self.button_overview = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.button_overview['text'] ="Create hypergraph overview"
+        self.button_overview.bind('<Button-3>',showbucket_text)        
+        self.button_overview['command'] = self.create_overview
+        self.button_overview.place(x=800,y=20)
 
 
         
@@ -869,6 +886,334 @@ class Application(Frame,object):
                 self.current_bucket = np.array(self.current_bucket)
                 self.current_bucket = self.current_bucket[self.current_bucket > -1]
                 self.theBuckets[self.catList[int(self.BucketSel[0])]] = self.current_bucket
+
+    def create_scenes_from_samples(self, sample_indices, image_mapping):
+        # Initialize the scenes dictionary
+        scenes = defaultdict(set)
+        
+        # Loop through each image in sample_indices
+        for image in sample_indices:
+            # Check if the image exists in image_mapping
+            if image in image_mapping:
+                # Loop through all hyperedges the image belongs to
+                for hyperedge in image_mapping[image]:
+                    hidx = int(hyperedge.split('_')[1])
+                    # Add the image to the set for that hyperedge in scenes
+                    scenes[hidx].add(image)
+        
+        # Convert sets to sorted tuples for each hyperedge in scenes
+        scenes = {key: tuple(sorted(images)) for key, images in scenes.items()}
+        
+        return scenes
+
+    
+
+
+
+    def create_overview(self):
+        # Initialize UMAP if not done
+        if len(self.umap_features) < 1:
+            modelu = umap.UMAP()
+            self.umap_features = modelu.fit_transform(self.features)
+            
+            # Normalize UMAP features to fit [0, 1] range
+            self.umap_features[:, 0] = self.umap_features[:, 0] + abs(np.min(self.umap_features[:, 0]))
+            self.umap_features[:, 1] = self.umap_features[:, 1] + abs(np.min(self.umap_features[:, 1]))
+            self.umap_features[:, 0] = self.umap_features[:, 0] / np.max(self.umap_features[:, 0])
+            self.umap_features[:, 1] = self.umap_features[:, 1] / np.max(self.umap_features[:, 1])
+            self.umap_pos = {i: tuple(pos) for i, pos in enumerate(self.umap_features)}
+
+        # Set initial zoom scale factor
+        self.scale_factor = 1.1  # This controls the zoom intensity per scroll
+
+        # Initialize pan variables
+        self._panning = False
+        self._pan_start = (0, 0)
+        self.update_timer = None
+
+        # Create the figure and axes
+        self.fig, self.ax = plt.subplots(figsize=(5, 4))
+        
+        # Initialize the canvas before calling redraw
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.newWindow)
+        self.canvas.get_tk_widget().pack(side="right", fill="both", expand=True)
+        
+        # Draw initial hypergraph
+        self.redraw_hypergraph()  # Now this can safely use self.canvas
+        
+        # Draw the initial canvas content
+        self.canvas.draw()
+
+        # Bind events for zooming and panning
+        self.canvas.get_tk_widget().bind("<MouseWheel>", self.zoom)
+        self.canvas.get_tk_widget().bind("<ButtonPress-1>", self.start_pan)
+        self.canvas.get_tk_widget().bind("<B1-Motion>", self.pan)
+        self.canvas.get_tk_widget().bind("<ButtonRelease-1>", self.end_pan)
+
+
+
+
+    def start_pan(self, event):
+        self._panning = True
+        self._pan_start = (event.x, event.y)
+        self.reset_timer()
+
+    def pan(self, event):
+        if not self._panning:
+            return
+
+        dx = event.x - self._pan_start[0]
+        dy = event.y - self._pan_start[1]
+        self._pan_start = (event.x, event.y)
+
+        dx_data, dy_data = self.ax.transData.inverted().transform((dx, dy)) - self.ax.transData.inverted().transform((0, 0))
+        dy_data = -dy_data
+
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        self.ax.set_xlim(xlim[0] - dx_data, xlim[1] - dx_data)
+        self.ax.set_ylim(ylim[0] - dy_data, ylim[1] - dy_data)
+
+        self.canvas.draw()
+        self.reset_timer()
+
+    def end_pan(self, event):
+        self._panning = False
+
+    def zoom(self, event):
+        xdata, ydata = self.ax.transData.inverted().transform((event.x, event.y))
+        scale_factor = 1 / self.scale_factor if event.delta > 0 else self.scale_factor
+
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+
+        new_xlim = [
+            xdata - (xdata - xlim[0]) * scale_factor,
+            xdata + (xlim[1] - xdata) * scale_factor
+        ]
+        new_ylim = [
+            ydata - (ydata - ylim[0]) * scale_factor,
+            ydata + (ylim[1] - ydata) * scale_factor
+        ]
+
+        self.ax.set_xlim(new_xlim)
+        self.ax.set_ylim(new_ylim)
+        self.canvas.draw()
+        self.reset_timer()
+
+    def reset_timer(self):
+        # Cancel any existing timer and start a new one
+        if self.update_timer:
+            self.update_timer.cancel()
+        self.update_timer = Timer(0.5, self.update_visible_points)
+        self.update_timer.start()
+    
+    def farthest_point_sampling(self, umap_pos, n_samples, initial_samples=None):
+            """
+            Selects `n_samples` points from `umap_pos` to be as evenly spread as possible using 
+            the farthest-point sampling approach.
+            
+            Parameters:
+                umap_pos (numpy.ndarray): 2D array with shape (n_points, 2) representing UMAP positions.
+                n_samples (int): The number of samples to select.
+                initial_samples (list): Optional list of initial points to include in the sampling.
+                
+            Returns:
+                numpy.ndarray: Indices of selected samples, with shape (n_samples,).
+            """
+
+            umap_pos = np.array(umap_pos)
+            sample_indices = []
+            
+            # Start with initial_samples if provided
+            if initial_samples:
+                sample_indices = list(range(len(initial_samples)))
+            else:
+                # Start with a random point if no initial samples
+                sample_indices = [np.random.randint(umap_pos.shape[0])]
+
+            # Iteratively add points that are farthest from the current sample
+            for _ in range(len(sample_indices), n_samples):
+                # Calculate the minimum distance from the existing samples to all points
+                distances = np.min(
+                    np.linalg.norm(umap_pos - umap_pos[sample_indices][:, np.newaxis], axis=2), 
+                    axis=0
+                )
+                
+                # Select the point farthest from the current set of sampled points
+                next_index = np.argmax(distances)
+                sample_indices.append(next_index)
+            
+            return np.array(sample_indices)
+    
+    def update_visible_points(self):
+        # Get the current visible area
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        # Determine if this is a zoom-out by comparing with previous limits
+        zoom_out = (
+            hasattr(self, 'previous_xlim') and
+            (xlim[0] < self.previous_xlim[0] or xlim[1] > self.previous_xlim[1] or
+            ylim[0] < self.previous_ylim[0] or ylim[1] > self.previous_ylim[1])
+        )
+
+
+        print(zoom_out)
+        if zoom_out:
+            # Step 1: Resample current bounding box
+
+            # visible_points = [
+            #     i for i, (x, y) in enumerate(self.umap_features)
+            #     if xlim[0] <= x <= xlim[1] and ylim[0] <= y <= ylim[1]
+            # ]
+            visible_points = []
+            for i, (x, y) in enumerate(self.umap_features):
+                # Check if the x-coordinate is within the x-axis limits
+                if xlim[0] <= x <= xlim[1]:
+                    # Check if the y-coordinate is within the y-axis limits
+                    if ylim[0] <= y <= ylim[1]:
+                        # Add the index to visible_points if both conditions are met
+                        visible_points.append(i)
+            
+            visible_points = np.array(visible_points)
+            vis_pts_umap = self.umap_features[visible_points]
+            # sampled_indices = self.farthest_point_sampling(
+            #     [self.umap_features[i] for i in visible_points], n_samples=25
+            # )
+            sampled_items = self.farthest_point_sampling(vis_pts_umap, n_samples=25)
+            sampled_indices = visible_points[sampled_items]
+            print(sampled_indices)
+            # Step 2: Count how many of the new samples fall within the old bounding box
+            within_old_box = [
+                i for i in sampled_indices
+                if (self.previous_xlim[0] <= self.umap_features[i][0] <= self.previous_xlim[1] and
+                    self.previous_ylim[0] <= self.umap_features[i][1] <= self.previous_ylim[1])
+            ]
+            count_within_old_box = len(within_old_box)
+            # Step 3: Choose that many points from previous_visible_points
+            retained_points = self.previous_visible_points[:count_within_old_box]
+
+            # Step 4: Add the remaining points from the new sampled_indices outside the old bounding box
+            additional_points = [
+                i for i in sampled_indices
+                if i not in within_old_box
+            ][:25 - len(retained_points)]
+
+            # Final sample combining old and new points
+            sample_indices = retained_points + additional_points
+
+        else:
+            # For zoom-in or regular behavior, keep standard sampling
+            visible_points = [
+                i for i, (x, y) in enumerate(self.umap_features)
+                if xlim[0] <= x <= xlim[1] and ylim[0] <= y <= ylim[1]
+            ]
+
+            # Retain points from the previous selection that are still visible
+            retained_points = [i for i in self.previous_visible_points if i in visible_points]
+
+            # Calculate the number of additional points needed
+            points_needed = max(0, 25 - len(retained_points))
+
+            # Sample additional points from the newly visible ones
+            new_visible_points = [i for i in visible_points if i not in retained_points]
+            if len(new_visible_points) <= points_needed:
+                additional_points = new_visible_points
+            else:
+                sampled_indices = self.farthest_point_sampling(
+                    [self.umap_features[i] for i in new_visible_points],
+                    n_samples=points_needed
+                )
+                additional_points = [new_visible_points[i] for i in sampled_indices]
+
+            sample_indices = retained_points + additional_points
+
+
+        # Store current limits as previous for the next call
+        self.previous_xlim = xlim
+        self.previous_ylim = ylim
+        # Update the previous visible points for the next zoom event
+        self.previous_visible_points = sample_indices
+        # Create a new hypergraph and redraw
+        scenes = self.create_scenes_from_samples(sample_indices, self.image_mapping)
+        # scenes = self.create_scenes_from_samples(sampled_indices, self.image_mapping)
+
+        self.redraw_hypergraph(scenes)
+
+    def calculate_image_sizes(self, points, base_size=200):
+        nbrs = NearestNeighbors(n_neighbors=2).fit(points)
+        distances, _ = nbrs.kneighbors(points)
+        # Get the nearest neighbor distance (2nd column since 1st is zero distance to itself)
+        nearest_distances = distances[:, 1]
+        # Calculate image sizes as half the nearest neighbor distance
+        image_sizes = np.clip(nearest_distances / 2, 20, base_size)  # Cap sizes between 20 and base_size
+        return image_sizes
+
+
+    def redraw_hypergraph(self, scenes=None):
+        # Capture the current view limits
+        current_xlim = self.ax.get_xlim()
+        current_ylim = self.ax.get_ylim()
+        print('redraw_hypergraph:','xlim:',current_xlim,'ylim:',current_ylim)
+
+        if scenes is None:
+            sample_indices = self.farthest_point_sampling(self.umap_features, n_samples=25)
+            scenes = self.create_scenes_from_samples(sample_indices, self.image_mapping)
+            self.previous_visible_points = sample_indices
+        # Clear old hypergraph layers, leaving only the most recent layer
+        if len(self.ax.collections) > 2:
+            self.ax.collections[0].remove()  # Removes the oldest layer in `collections`
+            self.ax.collections[0].remove()
+        
+        for collection in self.ax.collections:
+            collection.set_facecolor("lightgrey")
+            collection.set_edgecolor("lightgrey")
+
+        self.text_removes = len(self.ax.texts)
+        for idg in range(self.text_removes):
+            self.ax.texts[0].remove()  # Removes the oldest hyperedge label
+        # Create and draw the updated hypergraph
+        
+        
+        H = hnx.Hypergraph(scenes)
+        hnx.drawing.draw(
+            H, pos=self.umap_pos, with_node_labels=False, ax=self.ax
+        )
+        self.ax.set_facecolor("floralwhite")
+        self.fig.set_facecolor("floralwhite")
+        self.ax.grid(True, which='both')
+        # Restore the captured view limits
+        self.ax.set_xlim(current_xlim)
+        self.ax.set_ylim(current_ylim)
+        self.ax.axis("on")
+
+
+        with h5py.File(self.hdf_path, 'r') as hdf:
+            for image_box in self.image_boxes:
+                image_box.remove()  # Remove each previous AnnotationBbox from the plot
+            self.image_boxes.clear()
+            visible_points = [self.umap_features[i] for i in self.previous_visible_points]
+            image_sizes = self.calculate_image_sizes(visible_points)  # Calculate adaptive image sizes
+
+            for idx, img_idx in enumerate(self.previous_visible_points):
+                # Get the (x, y) location for the image from umap_features
+                x, y = self.umap_features[img_idx]
+
+                # Retrieve and process the thumbnail image
+                thumbnail_data = np.array(hdf.get('thumbnail_images')[img_idx], dtype='uint8')
+                image_size = int(image_sizes[idx])
+                thumbnail = Image.fromarray(thumbnail_data).resize((image_size, image_size))
+                
+                # Create OffsetImage and add it to the plot
+                offset_img = OffsetImage(thumbnail, zoom=1)
+                image_box = AnnotationBbox(offset_img, (x, y), frameon=False, box_alignment=(0.5, 0.5))
+                self.ax.add_artist(image_box)
+                self.image_boxes.append(image_box)  
+        # Redraw the canvas
+        self.canvas.draw()
+
+
+                            
 
 
     #function to focus on a selected image. From here you can draw a square to select a part of an image to compare against all other images                   
@@ -2823,13 +3168,12 @@ class Application(Frame,object):
             # Get image IDs and display them on the inner frame
             # image_ids = self.hyperedges[self.edge_ids[he_id]]
             image_ids = hyperedge
-            print('imgids:',image_ids)
             image_indices = np.array(list(image_ids), dtype=int)
-            print('imgindices:',image_indices)
             # inner_frame = Frame(hyperedge_canvas, bg='#555555')
             # inner_frame.bind('<Configure>', lambda e, canvas=hyperedge_canvas: canvas.configure(scrollregion=canvas.bbox('all')))
             # hyperedge_canvas.create_window((0, 0), window=inner_frame, anchor='nw')
-            
+            if len(image_indices) > 100:
+                image_indices = image_indices[0:100]
             self.display_images_on_canvas(self.hyperedge_canvases[-1], image_indices)
             # self.display_images_on_frame(inner_frame, image_indices)
 
