@@ -1058,7 +1058,6 @@ class Application(Frame,object):
         )
 
 
-        print(zoom_out)
         if zoom_out:
             # Step 1: Resample current bounding box
 
@@ -1082,7 +1081,6 @@ class Application(Frame,object):
             # )
             sampled_items = self.farthest_point_sampling(vis_pts_umap, n_samples=25)
             sampled_indices = visible_points[sampled_items]
-            print(sampled_indices)
             # Step 2: Count how many of the new samples fall within the old bounding box
             within_old_box = [
                 i for i in sampled_indices
@@ -1141,12 +1139,28 @@ class Application(Frame,object):
         self.redraw_hypergraph(scenes)
 
     def calculate_image_sizes(self, points, base_size=200):
+        # Fit nearest neighbors in data coordinates
         nbrs = NearestNeighbors(n_neighbors=2).fit(points)
         distances, _ = nbrs.kneighbors(points)
-        # Get the nearest neighbor distance (2nd column since 1st is zero distance to itself)
-        nearest_distances = distances[:, 1]
-        # Calculate image sizes as half the nearest neighbor distance
-        image_sizes = np.clip(nearest_distances / 2, 20, base_size)  # Cap sizes between 20 and base_size
+        nearest_distances = distances[:, 1]  # Second column for nearest neighbor distance
+
+        # Get current plot limits for scaling
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+
+        # Calculate the data range in x and y directions
+        data_width = xlim[1] - xlim[0]
+        data_height = ylim[1] - ylim[0]
+
+        # Get the figure size in inches and DPI for display scaling
+        fig_width, fig_height = self.fig.get_size_inches() * self.fig.dpi
+
+        # Convert data distances to display distances
+        display_distances = nearest_distances / np.sqrt((data_width / fig_width) ** 2 + (data_height / fig_height) ** 2)
+
+        # Scale image sizes and clip to defined range
+        image_sizes = np.clip(display_distances / 2, 20, base_size)  # Adjust as needed
+
         return image_sizes
 
 
@@ -1154,7 +1168,6 @@ class Application(Frame,object):
         # Capture the current view limits
         current_xlim = self.ax.get_xlim()
         current_ylim = self.ax.get_ylim()
-        print('redraw_hypergraph:','xlim:',current_xlim,'ylim:',current_ylim)
 
         if scenes is None:
             sample_indices = self.farthest_point_sampling(self.umap_features, n_samples=25)
@@ -1194,7 +1207,7 @@ class Application(Frame,object):
             self.image_boxes.clear()
             visible_points = [self.umap_features[i] for i in self.previous_visible_points]
             image_sizes = self.calculate_image_sizes(visible_points)  # Calculate adaptive image sizes
-
+            print(image_sizes)
             for idx, img_idx in enumerate(self.previous_visible_points):
                 # Get the (x, y) location for the image from umap_features
                 x, y = self.umap_features[img_idx]
