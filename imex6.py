@@ -393,6 +393,13 @@ class Application(Frame,object):
         self.button_overview['command'] = self.create_overview
         self.button_overview.place(x=800,y=20)
 
+        ### window for matrix view
+        self.matrixWindow = Toplevel(self.master)
+
+
+        self.matrixWindow.geometry("1400x500")
+        self.matrixWindow.title("Matrix view")
+        self.matrixWindow.configure(background='#555555')
 
         
         ### some other stuff ####
@@ -1206,7 +1213,6 @@ class Application(Frame,object):
             collection.set_facecolor("lightgrey")
             collection.set_edgecolor("lightgrey")
 
-        print(len(self.ax.collections))
         self.text_removes = len(self.ax.texts)
         for idg in range(self.text_removes):
             self.ax.texts[0].remove()  # Removes the oldest hyperedge label
@@ -1214,22 +1220,19 @@ class Application(Frame,object):
         
         
         H = hnx.Hypergraph(self.scenes)
-        print(H.edges.to_dataframe)
         # print(H.nodes.to_dataframe)
-        print(H.incidences.to_dataframe)
         h_indices = H.incidences.to_dataframe
-        array = np.array(list(h_indices.index))  # Convert the list of tuples to a NumPy array
-        _, idx = np.unique(array[:, 0], return_index=True)  # Get unique values and their indices
-        self.incidence_edge_ids = array[np.sort(idx), 0].tolist()  # Extract unique first values in order
+        array = np.array(list(h_indices.index))  
+        _, idx = np.unique(array[:, 0], return_index=True)  
+        self.incidence_edge_ids = array[np.sort(idx), 0].tolist()
 
 
-        print('ince',self.incidence_edge_ids)
         # self.draw_hypergraph(H, pos=self.umap_pos, ax=self.ax)
         hnx.drawing.draw(
             H, pos=self.umap_pos, with_node_labels=False, ax=self.ax, with_edge_labels=True
         )
-        self.ax.set_facecolor("floralwhite")
-        self.fig.set_facecolor("floralwhite")
+        self.ax.set_facecolor("#555555")
+        self.fig.set_facecolor("#555555")
         self.ax.grid(True, which='both')
         # Restore the captured view limits
         self.ax.set_xlim(current_xlim)
@@ -1278,62 +1281,33 @@ class Application(Frame,object):
         self.selected_hyperedges = []
         if isinstance(picked_object, PolyCollection):  # Check for hyperedge areas
             click_pos = (event.mouseevent.xdata, event.mouseevent.ydata)
+            edge_selected = False
 
             # Iterate through all paths in the PolyCollection
             for idx, path in enumerate(picked_object.get_paths()):
-                if path.contains_point(click_pos):  # Check if the click is inside the polygon
-                    self.selection = idx  # Assign the hyperedge ID
-                    
-                    edge_id = self.incidence_edge_ids[idx]
-                    self.selected_hyperedges.append(edge_id)
-                    print(f"Hyperedge {edge_id} selected.")
+                # Check if the click is near the edge of the polygon (adjust radius for sensitivity)
+                if path.contains_point(click_pos, radius=0.01):  # Click near edge
+                    if not path.contains_point(click_pos):  # Exclude points inside the polygon
+                        self.selection = idx  # Assign the hyperedge ID
+                        edge_id = self.incidence_edge_ids[idx]
+                        self.selected_hyperedges = [edge_id]  # Select only this edge
+                        print(f"Exact edge {edge_id} selected.")
+                        edge_selected = True
+                        break  # Stop checking once an edge is selected
 
-                    # Retrieve the current edge colors
-                    edge_colors = picked_object.get_edgecolor()
+            # If no exact edge was clicked, check for interior clicks
+            if not edge_selected:
+                for idx, path in enumerate(picked_object.get_paths()):
+                    if path.contains_point(click_pos):  # Click inside polygon
+                        edge_id = self.incidence_edge_ids[idx]
+                        self.selected_hyperedges.append(edge_id)
+                print(f"Hyperedges {self.selected_hyperedges} selected.")
 
-                    # Convert to a mutable list (edge_colors might be a numpy array)
-                    edge_colors = list(edge_colors)
-
-                    # Update the color of the selected edge
-                    edge_colors[idx] = 'black'
-
-                    # Apply the updated edge colors back to the PolyCollection
-                    picked_object.set_edgecolor(edge_colors)
-
-                    # Force a redraw of the canvas
-                    event.canvas.draw_idle()
+            # Force a redraw of the canvas
+            event.canvas.draw_idle()
 
 
-    # def on_pick(self, event):
-    #     """
-    #     Handles pick events for selecting hyperedges or points in the hypergraph.
 
-    #     Args:
-    #         event: The pick event containing information about the clicked artist.
-    #     """
-    #     # Check what was picked
-    #     print("ya got picked")
-    #     picked_object = event.artist  # The artist object that was clicked
-    #     print(picked_object)
-    #     if isinstance(picked_object, PolyCollection):  # Check for hyperedge areas
-    #         for idx, path in enumerate(picked_object.get_paths()):
-    #             if path.contains_point((event.mouseevent.xdata, event.mouseevent.ydata)):
-    #                 self.selection = idx  # Assign the hyperedge ID
-    #                 print(f"Hyperedge {idx} selected.")
-    #                 picked_object[idx].set_edgecolor('black')
-    #                 return
-
-    #     elif isinstance(picked_object, PathCollection):  # Check for points
-    #         offsets = picked_object.get_offsets()
-    #         mouse_x, mouse_y = event.mouseevent.xdata, event.mouseevent.ydata
-    #         distances = np.linalg.norm(offsets - np.array([mouse_x, mouse_y]), axis=1)
-    #         nearest_idx = np.argmin(distances)
-    #         if distances[nearest_idx] < 0.01:  # Threshold for click accuracy
-    #             self.selection = nearest_idx
-    #             print(f"Point {nearest_idx} selected.")
-    #             return
-
-    #     print("No valid selection made.")
 
 
     def select_in_hypergraph(self, event):
@@ -2183,7 +2157,8 @@ class Application(Frame,object):
         # self.imagex = []
         # self.cluster = np.asarray(self.cluster)
         self.display_hyperedges()
-    
+
+        
         
     
 
@@ -3403,7 +3378,6 @@ class Application(Frame,object):
             if (hasattr(self, 'canvasG') and widget == self.canvasG.get_tk_widget()) or \
             (hasattr(self, 'linked') and widget == self.linked):
                 # Skip destroying self.canvasG or self.linked if they exist
-                print(widget)
                 continue
             widget.destroy()
 
@@ -3591,6 +3565,7 @@ class Application(Frame,object):
         self.hyperedge_preparation()
         self.display_images(self.edge_images)
         self.display_overlapping_hyperedges()
+        self.display_matrix()
 
     def remove_selected_image_from_hyperedge(self):
         if self.selected_images == None:
@@ -3617,6 +3592,98 @@ class Application(Frame,object):
             # If the image mapping for i_idx is now empty, remove the entry
             if len(self.image_mapping[i_idx]) == 0:
                 del self.image_mapping[i_idx]
+
+    def display_matrix(self):
+        # Clear previous contents from the matrixWindow
+        for widget in self.matrixWindow.winfo_children():
+            widget.destroy()
+
+        selected_edge = self.selected_edge
+        if selected_edge not in self.hyperedges:
+            return
+
+        images_in_selected = self.hyperedges[selected_edge]
+
+        # Sort all edges and filter out the selected_edge so it is not displayed as a column
+        all_edges = [e for e in sorted(self.hyperedges.keys()) if e != selected_edge]
+
+        # Create a canvas and a frame inside it to enable scrolling
+        canvas = Canvas(self.matrixWindow, borderwidth=0, bg="#555555", highlightthickness=0)
+        scroll_y = Scrollbar(self.matrixWindow, orient="vertical", command=canvas.yview)
+        frame = Frame(canvas, bg="#555555")
+
+        # Associate the frame with the canvas for scrolling
+        frame_id = canvas.create_window((0,0), window=frame, anchor="nw")
+
+        # Configure canvas to use scrollbar
+        canvas.config(yscrollcommand=scroll_y.set)
+        scroll_y.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+
+        # Update scroll region on size changes
+        def update_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        frame.bind("<Configure>", update_scroll_region)
+
+        # Mouse wheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        # Bind mousewheel to canvas for scrolling when mouse is over the canvas
+        canvas.focus_set()
+        canvas.bind("<MouseWheel>", _on_mousewheel)
+
+        # Optional: Use enter/leave bindings if needed for more reliable scrolling
+        # def _bound_to_mousewheel(event):
+        #     canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # def _unbound_to_mousewheel(event):
+        #     canvas.unbind_all("<MouseWheel>")
+        # frame.bind('<Enter>', _bound_to_mousewheel)
+        # frame.bind('<Leave>', _unbound_to_mousewheel)
+
+        # Create header row (excluding the selected edge)
+        header_label = Label(frame, text="Image", font=("Arial", 12, "bold"), bg="#555555", fg="white")
+        header_label.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+
+        for col_idx, edge in enumerate(all_edges, start=1):
+            header_label = Label(frame, text=edge, font=("Arial", 12, "bold"), bg="#555555", fg="white")
+            header_label.grid(row=0, column=col_idx, sticky="nsew", padx=2, pady=2)
+
+        # Load and display images, membership
+        with h5py.File(self.hdf_path, 'r') as hdf:
+            self.my_matrix_img = []
+            for row_idx, img in enumerate(images_in_selected, start=1):
+                # Load and resize image
+                load = Image.fromarray(np.array(hdf.get('thumbnail_images')[img], dtype='uint8'))
+                load = load.resize((100, 100), Image.Resampling.LANCZOS)
+                render = ImageTk.PhotoImage(load)
+                self.my_matrix_img.append(render)
+
+                # Display image cell with #555555 background
+                img_label = Label(frame, image=render, width=100, height=100, bg="#555555")
+                img_label.grid(row=row_idx, column=0, sticky="nsew", padx=2, pady=2)
+
+                # Membership columns (excluding selected_edge)
+                for col_idx, edge in enumerate(all_edges, start=1):
+                    value = "1" if img in self.hyperedges[edge] else "0"
+                    
+                    # Default bg is #555555, if 1 then green
+                    cell_bg = "green" if value == "1" else "#555555"
+                    
+                    cell = Label(frame, text=value, font=("Arial", 10), width=3, height=2, bg=cell_bg, fg="white")
+                    cell.grid(row=row_idx, column=col_idx, sticky="nsew", padx=2, pady=2)
+
+        total_cols = len(all_edges) + 1
+        for c in range(total_cols):
+            frame.grid_columnconfigure(c, weight=1)
+
+        total_rows = len(images_in_selected) + 1
+        for r in range(total_rows):
+            frame.grid_rowconfigure(r, weight=0)
+
+        canvas.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
+
 
 
     # function to sort clusters based on a bucket. Average feature vector for 
@@ -3650,8 +3717,7 @@ class Application(Frame,object):
         self.num_clus = self.num_clus_bu
         self.df = self.df_bu
         self.showImg()
-        
-        
+                
     #function to calculate the average features of a cluster. This way, the most representative image of a cluster can be found. Doing so, an overview of all clusters using the representative image can be generated.
     def calculate_avg_vector(self):
         self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'calculate overview')
