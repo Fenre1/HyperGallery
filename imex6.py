@@ -782,8 +782,8 @@ class Application(Frame,object):
         num_im =int(self.e1.get())
         if num_im == 0:
             num_im = len(self.im_list)
-        if num_im > 4950:
-            num_im = 4950
+        if num_im > 1000:
+            num_im = 1000
         if num_im > len(cluster):
             num_im = len(cluster)
         else:
@@ -860,15 +860,15 @@ class Application(Frame,object):
         self.c.yview_scroll((int(-1*event.delta/120)), "units")
         self.scrolled_images = self.c.yview()
         
-        if self.scrolled_images[1] == 1:
-            self.totimseen.append(len(self.ccluster))
-        else:
-            num_above = int(self.scrolled_images[0]*self.row_)*self.num_im_row
-            if len(self.ccluster)- num_above < self.num_im_row*self.num_im_col:
-                num_below = len(self.ccluster)- num_above
-            else:
-                num_below = self.num_im_row*self.num_im_col
-            self.totimseen.append(num_above+num_below)
+        # if self.scrolled_images[1] == 1:
+        #     self.totimseen.append(len(self.ccluster))
+        # else:
+        #     num_above = int(self.scrolled_images[0]*self.row_)*self.num_im_row
+        #     if len(self.ccluster)- num_above < self.num_im_row*self.num_im_col:
+        #         num_below = len(self.ccluster)- num_above
+        #     else:
+        #         num_below = self.num_im_row*self.num_im_col
+        #     self.totimseen.append(num_above+num_below)
          
         
     def _on_mousewheel_second_window(self, event):
@@ -1256,7 +1256,25 @@ class Application(Frame,object):
                 
                 # Create OffsetImage and add it to the plot
                 offset_img = OffsetImage(thumbnail, zoom=1)
-                image_box = AnnotationBbox(offset_img, (x, y), frameon=False, box_alignment=(0.5, 0.5))
+                if hasattr(self, 'selected_he_image_id') and img_idx == self.selected_he_image_id:
+                    print('it does!')
+                    # Draw a blue border around the selected image
+                    image_box = AnnotationBbox(
+                        offset_img,
+                        (x, y),
+                        frameon=True,
+                        box_alignment=(0.5, 0.5),
+                        bboxprops={"edgecolor": "skyblue", "linewidth": 5}
+                    )
+                    image_box.set_zorder(1000)
+                else:
+                    # No border for non-selected images
+                    image_box = AnnotationBbox(
+                        offset_img,
+                        (x, y),
+                        frameon=False,
+                        box_alignment=(0.5, 0.5)
+                    )
                 self.ax.add_artist(image_box)
                 self.image_boxes.append(image_box)  
         # Redraw the canvas
@@ -1286,7 +1304,7 @@ class Application(Frame,object):
             # Iterate through all paths in the PolyCollection
             for idx, path in enumerate(picked_object.get_paths()):
                 # Check if the click is near the edge of the polygon (adjust radius for sensitivity)
-                if path.contains_point(click_pos, radius=0.01):  # Click near edge
+                if path.contains_point(click_pos, radius=0.005):  # Click near edge
                     if not path.contains_point(click_pos):  # Exclude points inside the polygon
                         self.selection = idx  # Assign the hyperedge ID
                         edge_id = self.incidence_edge_ids[idx]
@@ -1299,8 +1317,14 @@ class Application(Frame,object):
             if not edge_selected:
                 for idx, path in enumerate(picked_object.get_paths()):
                     if path.contains_point(click_pos):  # Click inside polygon
-                        edge_id = self.incidence_edge_ids[idx]
-                        self.selected_hyperedges.append(edge_id)
+                        try:
+                            edge_id = self.incidence_edge_ids[idx]
+                            self.selected_hyperedges.append(edge_id)
+                        except IndexError:
+                            print('index error idx')
+                            
+
+                        
                 print(f"Hyperedges {self.selected_hyperedges} selected.")
 
             # Force a redraw of the canvas
@@ -1318,62 +1342,238 @@ class Application(Frame,object):
             event: A mouse click event from the canvas.
         """
         # Check if the right mouse button was clicked
-        if event.button != 3:  # 3 corresponds to the right mouse button
-            return  # Ignore other clicks
+        if event.button != 3:
+            return
 
-        # Get the coordinates of the click in data space
         click_x, click_y = event.x, event.y
-        data_x, data_y = self.ax.transData.inverted().transform((click_x, click_y))  # Transform to data coordinates
+        data_x, data_y = self.ax.transData.inverted().transform((click_x, click_y))
 
-        # Reset the selection
         self.selection = None
 
-        # Case 1: Check if the click is on an image using AnnotationBbox
         for idx, image_box in enumerate(self.image_boxes):
-            # Get the bounding box of the AnnotationBbox
             bbox = image_box.get_window_extent(self.canvasG.get_renderer())
-
-            # Transform the bounding box to data coordinates
             bbox_data = bbox.transformed(self.ax.transData.inverted())
 
-            # Check if the click is within the bounding box
             if bbox_data.contains(data_x, data_y):
-                self.selection = idx  # Select the image ID
-                print(f"Image {idx} selected.")
+                self.selection = idx
+                self.selected_image_id = self.previous_visible_points[idx]  # Store the selected image index
+                print(f"Image {idx} selected.", "img_id:",self.selected_image_id)
+
+                # After selecting the image, update the overlapping hyperedges view
+                self.display_overlapping_hyperedges()
+                self.after(100, self.scroll_to_selected_image)
                 return
 
-        # # Case 2: Check if the click is on a hyperedge line
-        # for he_id, hyperedge in enumerate(self.scenes.keys()):
-        #     hyperedge_lines = self.ax.findobj(match=lambda obj: hasattr(obj, '_hyperedge_id') and obj._hyperedge_id == he_id)
-        #     for line in hyperedge_lines:
-        #         path = line.get_path()
-        #         if path.contains_point((data_x, data_y), radius=2):  # Check proximity to the line
-        #             self.selection = he_id  # Select the hyperedge
-        #             print(f"Hyperedge {he_id} line selected.")
-        #             return
-
-        # # Case 3: Check if the click is inside a hyperedge area
-        # contained_hyperedges = []
-        # for he_id, hyperedge in enumerate(self.scenes.keys()):
-        #     hyperedge_region = self.ax.findobj(match=lambda obj: hasattr(obj, '_hyperedge_id') and obj._hyperedge_id == he_id)
-        #     for region in hyperedge_region:
-        #         path = region.get_path()
-        #         if path.contains_point((data_x, data_y)):  # Check if inside the area
-        #             contained_hyperedges.append(he_id)
-
-        # if contained_hyperedges:
-        #     self.selection = contained_hyperedges if len(contained_hyperedges) > 1 else contained_hyperedges[0]
-        #     print(f"Hyperedge(s) {self.selection} selected.")
-        #     return
-
-        # If nothing is selected
-        # print("No selection made.")
 
 
 
+    def scroll_to_selected_image(self):
+        print('wazzap')
+        # Make sure we have a selected image
+        if not hasattr(self, 'selected_image_id'):
+            return
+        selected_img = self.selected_image_id
+        print('selected_img',selected_img)
+        # Identify the correct hyperedge index (he_id) from either overlapping_hyperedges or scenes
+        if self.linked.var.get():
+            # Linked mode: use self.scenes to find hyperedge containing selected_img
+            target_he_id = None
+            # scenes is {hyperedge_id: (img1, img2, ...)}
+            for he_id, imgs in self.scenes.items():
+                # Convert images and selected_img to same type if needed
+                # Assuming imgs are strings and selected_img is int, convert selected_img to string
+                if selected_img in imgs:
+                    target_he_id = he_id
+                    break
+            if target_he_id is None:
+                return
+
+            # Find the index in self.hyperedge_canvases that corresponds to target_he_id
+            # In display_overlapping_hyperedges() for linked == True:
+            # for he_id, (hyperedge_id, _) in enumerate(self.scenes.items()):
+            # hyperedge_id is the key in scenes, and he_id is its index
+            target_index = None
+            for i, (hid, _) in enumerate(self.scenes.items()):
+                if hid == target_he_id:
+                    target_index = i
+                    break
+        else:
+            # Non-linked mode: use self.overlapping_hyperedges
+            target_index = None
+            for he_id, hyperedge in enumerate(self.overlapping_hyperedges):
+                # hyperedge is a list or set of images (likely integers or strings)
+                # Ensure type consistency. If selected_img is int and hyperedge contains ints, this is fine.
+                if selected_img in hyperedge:
+                    target_index = he_id
+                    break
+
+        if target_index is None:
+            return
+
+        # Ensure UI geometry is up-to-date
+        self.left_frame.update_idletasks()
+        self.main_canvas.update_idletasks()
+
+        # Scroll the main canvas to show the target hyperedge
+        # Each hyperedge_canvas is appended in order to self.hyperedge_canvases
+        target_canvas = self.hyperedge_canvases[target_index]
+        target_frame = self.hyperedge_frames[target_index] 
+        self.left_frame.update_idletasks()
+        self.main_canvas.update_idletasks()
+        # Get the y-coordinate of this canvas relative to the frame
+        y_coord = target_frame.winfo_y()
+        # Get total height from scrollregion
+        bbox_all = self.main_canvas.bbox("all")
+        total_height = bbox_all[3] - bbox_all[1]
+
+        if total_height > 0:
+            fraction = max(0, min(y_coord / total_height, 1))
+            self.main_canvas.yview_moveto(fraction)
+
+        # Now scroll inside the target_canvas to show the selected image
+        # We need to replicate indexing logic from display_images_on_canvas()
+        bbox_selected = target_canvas.bbox('selected_tag')
+        if bbox_selected:
+            x1, y1, x2, y2 = bbox_selected
+            # Get the scrollregion for the target_canvas
+            scrollregion = target_canvas.cget("scrollregion")
+            if scrollregion:
+                # Format: "0 0 x1 y1"
+                _, _, _, y_max = scrollregion.split()
+                y_max = float(y_max)
+
+                if y_max > 0:
+                    # Compute fraction to scroll. For example, scroll so that the top of 
+                    # selected image (y1) is at the top of the view.
+                    fraction_img = y1 / y_max
+
+                    # To center the image instead of aligning the top:
+                    # image_height = y2 - y1
+                    # desired_center = (y1 + y2) / 2
+                    # fraction_img = (desired_center - image_height/2) / y_max
+
+                    target_canvas.yview_moveto(fraction_img)
+                                            
+    def click_select_in_overlapping_hyperedges(self, event):
+        """
+        Right-click handler for the overlapping hyperedge canvas.
+        This is an example; integrate with your existing event system.
+        """
+        if event.num == 3:  # Right-click
+            canvas = event.widget
+            print(canvas)
+            x = canvas.canvasx(event.x)
+            y = canvas.canvasy(event.y)
             
+            # Find the clicked item on the canvas
+            clicked_item = canvas.find_closest(x, y)
+            if clicked_item:
+                tags = canvas.gettags(clicked_item)
+                image_idx = None
+                for t in tags:
+                    if t.isdigit():
+                        image_idx = int(t)
+                        break
+                if image_idx is not None:
+                    # We also need to know which hyperedge this canvas corresponds to
+                    # Assuming each hyperedge_canvas is appended in the same order as hyperedges:
+                    # and we stored `hyperedge_frames` or have a way to index `self.hyperedge_canvases`
+                    hyperedge_index = self.hyperedge_canvases.index(canvas)
+                    
+                    # If linked mode:
+                    if self.linked.var.get():
+                        # For linked mode, hyperedges come from self.scenes.
+                        # Find the hyperedge_id by enumerating self.scenes
+                        hyperedge_id = list(self.scenes.keys())[hyperedge_index]
+                        hyperedge_key = f"edge_{hyperedge_id}"
+                    else:
+                        # Non-linked mode: from self.overlapping_hyperedges and self.edge_ids
+                        # hyperedge_index corresponds to self.overlapping_hyperedges[hyperedge_index]
+                        hyperedge_key = self.edge_ids[hyperedge_index]
 
-                                
+                    self.focus_on_image_in_projection(image_idx, hyperedge_key)
+
+
+    def focus_on_image_in_projection(self, image_idx, hyperedge_key):
+        """
+        1. Zoom the UMAP projection so the entire hyperedge is in view.
+        2. From the now visible points in the projection, pick the clicked image plus 24 more using farthest-point sampling.
+        3. Redraw the hypergraph with these 25 points.
+        """
+
+        # Get all images of that hyperedge
+        hyperedge_images = self.hyperedges[hyperedge_key]
+        hyperedge_images = list(map(int, hyperedge_images))
+
+        # Compute bounding box of hyperedge images in the UMAP projection
+        hyperedge_positions = self.umap_features[hyperedge_images]
+        x_coords = hyperedge_positions[:, 0]
+        y_coords = hyperedge_positions[:, 1]
+        x_min, x_max = np.min(x_coords), np.max(x_coords)
+        y_min, y_max = np.min(y_coords), np.max(y_coords)
+
+        # Add padding so they're not at the very edge
+        padding_factor = 0.1
+        x_range = x_max - x_min
+        y_range = y_max - y_min
+        x_min -= x_range * padding_factor
+        x_max += x_range * padding_factor
+        y_min -= y_range * padding_factor
+        y_max += y_range * padding_factor
+
+        # Set the axes to show the entire hyperedge
+        self.ax.set_xlim(x_min, x_max)
+        self.ax.set_ylim(y_min, y_max)
+        self.canvasG.draw_idle()
+        self.left_frame.update_idletasks()
+        self.main_canvas.update_idletasks()
+
+        # Now, determine which points are visible in this new view:
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+
+        # Find visible points based on current axes
+        visible_points = [
+            i for i, (x, y) in enumerate(self.umap_features)
+            if xlim[0] <= x <= xlim[1] and ylim[0] <= y <= ylim[1]
+        ]
+
+        # Make sure the clicked image is visible (it should be since we zoomed to the hyperedge containing it)
+        if image_idx not in visible_points:
+            # If for some reason the image is not visible, we might need to adjust zoom or return.
+            print("Clicked image not visible after zoom, adjusting...")
+            # For simplicity, assume it is visible. If not, you may need to broaden the bounds and redraw.
+            return
+
+        # We want to pick 25 images, ensuring image_idx is included.
+        # Let's use farthest_point_sampling:
+        # We'll pass the selected image's position as an initial sample.
+        visible_positions = self.umap_features[visible_points]
+        selected_pos = [self.umap_features[image_idx]]  # initial sample
+
+        # Perform farthest point sampling:
+        # n_samples = 25 total, 1 is already the selected image, so we provide initial_samples
+        sampled_relative = self.farthest_point_sampling(
+            visible_positions, n_samples=25, initial_samples=selected_pos
+        )
+        # sampled_relative are indices in visible_positions
+        sampled_indices = [visible_points[i] for i in sampled_relative]
+
+        # Ensure the selected image is included (farthest_point_sampling should handle that if it starts from it)
+        # But if not included, insert it at the start
+        if image_idx not in sampled_indices:
+            sampled_indices[0] = image_idx  # force it in
+
+        self.previous_visible_points = sampled_indices
+    
+        self.selected_he_image_id = image_idx
+        print(self.selected_he_image_id)
+        # Create scenes from these samples
+        self.scenes = self.create_scenes_from_samples(self.previous_visible_points, self.image_mapping)
+        # Redraw hypergraph
+        self.redraw_hypergraph(self.scenes)
+
+
 
 
     #function to focus on a selected image. From here you can draw a square to select a part of an image to compare against all other images                   
@@ -3371,16 +3571,17 @@ class Application(Frame,object):
             return pos
 
 
+ 
+
+
     def display_overlapping_hyperedges(self):
-        
         # Destroy existing widgets in the new window
         for widget in self.left_frame.winfo_children():
             if (hasattr(self, 'canvasG') and widget == self.canvasG.get_tk_widget()) or \
-            (hasattr(self, 'linked') and widget == self.linked):
+                    (hasattr(self, 'linked') and widget == self.linked):
                 # Skip destroying self.canvasG or self.linked if they exist
                 continue
             widget.destroy()
-
         
         # Clear the list of hyperedge_canvases
         self.hyperedge_canvases.clear()
@@ -3401,56 +3602,68 @@ class Application(Frame,object):
         # Update scrollregion when the frame size changes
         frame.bind('<Configure>', lambda e: self.main_canvas.configure(scrollregion=self.main_canvas.bbox('all')))
         
+        # Configure rows/columns in the frame so they expand properly
+        frame.grid_columnconfigure(0, weight=1)
+        # We'll place each hyperedge in consecutive rows
+        row_idx = 0
+        self.hyperedge_frames = []
 
         if self.linked.var.get() == False:
-            # For each overlapping hyperedge, create a canvas and display images
+            # For each overlapping hyperedge
             for he_id, hyperedge in enumerate(self.overlapping_hyperedges):
                 # Label for the hyperedge
                 label = Label(frame, text=self.edge_ids[he_id], bg='#555555', fg='white', font=('Arial', 14))
-                label.pack(fill=X, padx=10, pady=5)
-            
+                label.grid(row=row_idx, column=0, sticky='ew', padx=10, pady=5)
+                row_idx += 1
+
                 # Frame to hold the canvas and its scrollbar
-                canvas_frame = Frame(frame)
-                canvas_frame.pack(padx=10, pady=5, fill=BOTH, expand=TRUE)
+                canvas_frame = Frame(frame, bg='#555555')
+                canvas_frame.grid(row=row_idx, column=0, sticky='nsew', padx=10, pady=5)
+                
+
+
+                # Allow canvas_frame to expand
+                frame.grid_rowconfigure(row_idx, weight=1)
 
                 # Canvas for the hyperedge images
                 hyperedge_canvas = Canvas(canvas_frame, bg='#555555', width=800, height=600)
-                hyperedge_canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
+                hyperedge_canvas.grid(row=0, column=0, sticky='nsew')
+
+                # Configure canvas_frame to expand
+                canvas_frame.grid_rowconfigure(0, weight=1)
+                canvas_frame.grid_columnconfigure(0, weight=1)
+
                 hyperedge_canvas.my_tag = he_id
                 # Vertical scrollbar for the hyperedge canvas
                 v_scrollbar = Scrollbar(canvas_frame, orient=VERTICAL, command=hyperedge_canvas.yview)
-                v_scrollbar.pack(side=RIGHT, fill=Y)
-            
+                v_scrollbar.grid(row=0, column=1, sticky='ns')
+
                 hyperedge_canvas.configure(yscrollcommand=v_scrollbar.set)
-                self.list_of_colors
-                
+
                 # Bind mouse wheel events to the hyperedge canvas
                 hyperedge_canvas.bind('<Enter>', lambda event: event.widget.focus_set())
                 hyperedge_canvas.bind('<Enter>', self._bound_to_mousewheel_second_window)
                 hyperedge_canvas.bind('<Leave>', self._unbound_to_mousewheel_second_window)
                 hyperedge_canvas.bind('<Button-2>', self.open_image3)
                 hyperedge_canvas.bind('<Button-1>', self.click_select)
+                hyperedge_canvas.bind('<Button-3>', self.click_select_in_overlapping_hyperedges)
                 hyperedge_canvas.bind('<Shift-Button-1>', self.shift_click_select)
                 hyperedge_canvas.bind('<Control-Button-1>', self.ctrl_click_select)
-                # hyperedge_canvas.bind('<Button-3>', self.rank_images)
                 hyperedge_canvas.bind('<Double-Button-1>', self.double_click_overview)
-            
-                # Create an inner frame inside the hyperedge canvas
-            
-                # Update scrollregion when the inner frame size changes
-                
+
                 self.hyperedge_canvases.append(hyperedge_canvas)
-                # Get image IDs and display them on the inner frame
-                # image_ids = self.hyperedges[self.edge_ids[he_id]]
+                
+                self.hyperedge_frames.append(canvas_frame)
+                # Get image IDs and display them
                 image_ids = hyperedge
                 image_indices = np.array(list(image_ids), dtype=int)
-                # inner_frame = Frame(hyperedge_canvas, bg='#555555')
-                # inner_frame.bind('<Configure>', lambda e, canvas=hyperedge_canvas: canvas.configure(scrollregion=canvas.bbox('all')))
-                # hyperedge_canvas.create_window((0, 0), window=inner_frame, anchor='nw')
                 if len(image_indices) > 100:
                     image_indices = image_indices[0:100]
                 self.display_images_on_canvas(self.hyperedge_canvases[-1], image_indices)
-                # self.display_images_on_frame(inner_frame, image_indices)
+
+                # Move to the next row for next hyperedge
+                row_idx += 1
+
         elif self.linked.var.get() == True:
             # For each hyperedge in self.scenes, create a canvas and display images
             for he_id, (hyperedge_id, _) in enumerate(self.scenes.items()):
@@ -3461,46 +3674,59 @@ class Application(Frame,object):
                 if full_hyperedge_key in self.hyperedges:
                     images = self.hyperedges[full_hyperedge_key]
                 else:
-                    continue  # Skip if the hyperedge ID is not found in self.hyperedges
+                    continue  # Skip if the hyperedge is not found
+
+                # Reorder images
+                pvp_set = set(self.previous_visible_points)
+                prioritized = [img for img in images if img in pvp_set]
+                remaining = [img for img in images if img not in pvp_set]
+                reordered_images = prioritized + remaining
+                if len(reordered_images) > 100:
+                    reordered_images = reordered_images[:100]
 
                 # Label for the hyperedge
                 label = Label(frame, text=f"Hyperedge {hyperedge_id}", bg='#555555', fg='white', font=('Arial', 14))
-                label.pack(fill=X, padx=10, pady=5)
+                label.grid(row=row_idx, column=0, sticky='ew', padx=10, pady=5)
+                row_idx += 1
 
                 # Frame to hold the canvas and its scrollbar
-                canvas_frame = Frame(frame)
-                canvas_frame.pack(padx=10, pady=5, fill=BOTH, expand=TRUE)
+                canvas_frame = Frame(frame, bg='#555555')
+                canvas_frame.grid(row=row_idx, column=0, sticky='nsew', padx=10, pady=5)
+                frame.grid_rowconfigure(row_idx, weight=1)
 
                 # Canvas for the hyperedge images
                 hyperedge_canvas = Canvas(canvas_frame, bg='#555555', width=800, height=600)
-                hyperedge_canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
+                hyperedge_canvas.grid(row=0, column=0, sticky='nsew')
+
+                canvas_frame.grid_rowconfigure(0, weight=1)
+                canvas_frame.grid_columnconfigure(0, weight=1)
+
                 hyperedge_canvas.my_tag = he_id
 
                 # Vertical scrollbar for the hyperedge canvas
                 v_scrollbar = Scrollbar(canvas_frame, orient=VERTICAL, command=hyperedge_canvas.yview)
-                v_scrollbar.pack(side=RIGHT, fill=Y)
+                v_scrollbar.grid(row=0, column=1, sticky='ns')
                 hyperedge_canvas.configure(yscrollcommand=v_scrollbar.set)
 
-                # Bind mouse wheel events to the hyperedge canvas
+                # Bind mouse wheel events
                 hyperedge_canvas.bind('<Enter>', lambda event: event.widget.focus_set())
                 hyperedge_canvas.bind('<Enter>', self._bound_to_mousewheel_second_window)
                 hyperedge_canvas.bind('<Leave>', self._unbound_to_mousewheel_second_window)
                 hyperedge_canvas.bind('<Button-2>', self.open_image3)
                 hyperedge_canvas.bind('<Button-1>', self.click_select)
+                hyperedge_canvas.bind('<Button-3>', self.click_select_in_overlapping_hyperedges)
                 hyperedge_canvas.bind('<Shift-Button-1>', self.shift_click_select)
                 hyperedge_canvas.bind('<Control-Button-1>', self.ctrl_click_select)
-                # hyperedge_canvas.bind('<Button-3>', self.rank_images)
                 hyperedge_canvas.bind('<Double-Button-1>', self.double_click_overview)
 
-                # Append canvas to list
                 self.hyperedge_canvases.append(hyperedge_canvas)
+                self.hyperedge_frames.append(canvas_frame)
 
-                # Get image indices and display them on the canvas
-                image_indices = np.array(list(images), dtype=int)
-                if len(image_indices) > 100:
-                    image_indices = image_indices[0:100]
-        
+                image_indices = np.array(list(reordered_images), dtype=int)
                 self.display_images_on_canvas(self.hyperedge_canvases[-1], image_indices)
+
+                # Move to the next row for the next hyperedge
+                row_idx += 1
 
 
 
@@ -3556,7 +3782,14 @@ class Application(Frame,object):
                         tags='share_tag'
                     )
                     self.sharetangles.append(rect)
-
+                if hasattr(self, 'selected_image_id') and img_idx == self.selected_image_id:
+                    bbox = canvas.bbox(for_bb)
+                    rect = canvas.create_rectangle(
+                        bbox,
+                        outline='skyblue',
+                        width=3,
+                        tags='selected_tag'
+                    )
 
 
 
@@ -3565,7 +3798,7 @@ class Application(Frame,object):
         self.hyperedge_preparation()
         self.display_images(self.edge_images)
         self.display_overlapping_hyperedges()
-        self.display_matrix()
+        # self.display_matrix()
 
     def remove_selected_image_from_hyperedge(self):
         if self.selected_images == None:
@@ -3601,9 +3834,10 @@ class Application(Frame,object):
         selected_edge = self.selected_edge
         if selected_edge not in self.hyperedges:
             return
-
+        
         images_in_selected = self.hyperedges[selected_edge]
-
+        if len(images_in_selected) > 200:
+            images_in_selected = set(list(images_in_selected)[:200])
         # Sort all edges and filter out the selected_edge so it is not displayed as a column
         all_edges = [e for e in sorted(self.hyperedges.keys()) if e != selected_edge]
 
