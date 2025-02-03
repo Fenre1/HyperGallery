@@ -4,7 +4,7 @@ Created on Wed May 16 13:20:32 2018
 
 @author: ovv
 """
-import shutil
+# import shutil
 from tkinter import *
 from PIL import Image, ImageTk, ExifTags, ImageFile, ImageGrab, ImageDraw
 import pandas as pd
@@ -27,28 +27,28 @@ import os
 import io
 import string
 import random
-import glob
+# import glob
 #import torch
 import copy
-import torchvision.models as models
-import torchvision.transforms as transforms
-import torch.nn.functional as F
-import torch
+# import torchvision.models as models
+# import torchvision.transforms as transforms
+# import torch.nn.functional as F
+# import torch
 import webbrowser
 # from PIL.ExifTags import TAGS, GPSTAGS
 from itertools import chain
-import torch.utils.data as data
+# import torch.utils.data as data
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 #from sklearn.neighbors import typedefs
 #from sklearn.manifold import TSNE
-from sklearn.cluster import KMeans
-import sklearn.utils._cython_blas
+# from sklearn.cluster import KMeans
+# import sklearn.utils._cython_blas
 #import sklearn.neighbors.quad_tree
 # import sklearn.tree
 # import sklearn.tree._utils
-from scipy.spatial import distance
+# from scipy.spatial import distance
 import umap
-from scipy.sparse import lil_matrix
+# from scipy.sparse import lil_matrix
 #from sklearn.decomposition import PCA
 #for graphs
 #import matplotlib
@@ -64,7 +64,7 @@ import warnings
 import time
 #import timm
 
-import rasterfairy #from 2d point cloud to square grid. Need to change import rasterfairy.prime to import rasterfairy.prime as prime in the rasterfairy.py file. You also need to change np.float to float.
+# import rasterfairy #from 2d point cloud to square grid. Need to change import rasterfairy.prime to import rasterfairy.prime as prime in the rasterfairy.py file. You also need to change np.float to float.
 import bottleneck as bn
 import exifread
 import hypernetx as hnx
@@ -76,6 +76,11 @@ from matplotlib import colormaps
 import matplotlib.colors as mcolors
 from sklearn.neighbors import NearestNeighbors
 from threading import Timer
+
+# from VirtualMatrix import VirtualMatrix, create_frozen_header
+from matrix_view import LazyImagePanel, SyncScrollExample
+from tkintertable import TableCanvas, TableModel
+from synced_table_canvas import SyncedTableCanvas
 #import clip ## only if model used is clip... 
 
 batch_size  = 8
@@ -346,6 +351,9 @@ class Application(Frame,object):
         self.lb.bind('<Button-3>',load_text)
         self.lb.place(x=200,y=20)
 
+        self.e2 = Entry(background='#777777',foreground = 'white',exportselection=0,width=23)
+        self.e2.insert(END, 'new name')
+        self.e2.place(x=400,y=50)
 
                
         #button to show or hide images in the Non-relevant bucket
@@ -395,8 +403,6 @@ class Application(Frame,object):
 
         ### window for matrix view
         self.matrixWindow = Toplevel(self.master)
-
-
         self.matrixWindow.geometry("1400x500")
         self.matrixWindow.title("Matrix view")
         self.matrixWindow.configure(background='#555555')
@@ -447,12 +453,58 @@ class Application(Frame,object):
 #        self.changename.place(x=0, y=0)
         #button to change name of a bucket
         self.changebutton = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
-        self.changebutton['text'] = "Change bucket name"
-        self.changebutton['command'] = self.change_name
+        self.changebutton['text'] = "Rename hyperedge"
+        self.changebutton['command'] = self.rename_hyperedge
         self.changebutton.bind('<Button-3>',changename_text)
         self.changebutton.place(x=400, y=20)
         
-        
+        self.chosen_edges = Listbox(
+        self.master,  # or whichever parent
+        width=30,
+        background='#777777',
+        foreground='white',
+        selectmode='extended',
+        exportselection=False
+    )
+        self.chosen_edges.place(x=810, y=50)  # adjust geometry as needed
+
+        # Button to add selected hyperedges to chosen_edges
+        self.add_button = Button(
+            self.master,
+            text="Add >",
+            command=self.add_to_chosen_edges
+        )
+        self.add_button.place(x=750, y=50)
+
+        # Button to remove selected hyperedges from chosen_edges
+        self.remove_button = Button(
+            self.master,
+            text="< Remove",
+            command=self.remove_from_chosen_edges
+        )
+        self.remove_button.place(x=750, y=80)
+
+        # Radio buttons for exclude/include
+        self.filter_mode = StringVar(value="exclude")  # default
+
+        self.exclude_rb = Radiobutton(
+            self.master,
+            text="Exclude",
+            variable=self.filter_mode,
+            value="exclude",
+            command=self.apply_filter
+        )
+        self.exclude_rb.place(x=810, y=220)
+
+        self.include_rb = Radiobutton(
+            self.master,
+            text="Include",
+            variable=self.filter_mode,
+            value="include",
+            command=self.apply_filter
+        )
+        self.include_rb.place(x=900, y=220)
+            
         #enter the size of the images displayed. 100 is default
         self.imsize = 100
         self.imsize_entry = Entry(background='#777777',foreground = 'white',exportselection=0)
@@ -909,30 +961,64 @@ class Application(Frame,object):
                 self.current_bucket = self.current_bucket[self.current_bucket > -1]
                 self.theBuckets[self.catList[int(self.BucketSel[0])]] = self.current_bucket
 
-    def create_scenes_from_samples(self, sample_indices, image_mapping):
-        # Initialize the scenes dictionary
-        scenes = defaultdict(set)
+    # def create_scenes_from_samples(self, sample_indices, image_mapping):
+    #     sample_indices = self.all_filtered_images[sample_indices]
+    #     # Initialize the scenes dictionary
+    #     scenes = defaultdict(set)
+    #     hg_keys = self.filtered_hyperedges.keys()
+    #     # Loop through each image in sample_indices
+    #     for image in sample_indices:
+    #         # Check if the image exists in image_mapping
+    #         if image in image_mapping:
+    #             # Loop through all hyperedges the image belongs to
+    #             for hyperedge in image_mapping[image]:
+    #                 if hyperedge in hg_keys:
+    #                     hidx = int(hyperedge.split('_')[1])
+    #                     # Add the image to the set for that hyperedge in scenes
+    #                     scenes[hidx].add(image)
         
+    #     # Convert sets to sorted tuples for each hyperedge in scenes
+    #     scenes = {key: tuple(sorted(images)) for key, images in scenes.items()}
+        
+    #     return scenes
+
+    def create_scenes_from_samples(self, sample_indices, image_mapping):
+        """
+        Creates a dictionary mapping each hyperedge name -> tuple of images
+        from the sample_indices that belong to that hyperedge.
+        """
+        sample_indices = self.all_filtered_images[sample_indices]
+        # scenes is a dict of {hyperedge_name : set_of_images}
+        scenes = defaultdict(set)
+
+        # This might be a dict, or maybe an OrderedDict, depending on how you store it
+        valid_hyperedges = set(self.filtered_hyperedges.keys())
+
         # Loop through each image in sample_indices
         for image in sample_indices:
             # Check if the image exists in image_mapping
             if image in image_mapping:
                 # Loop through all hyperedges the image belongs to
-                for hyperedge in image_mapping[image]:
-                    hidx = int(hyperedge.split('_')[1])
-                    # Add the image to the set for that hyperedge in scenes
-                    scenes[hidx].add(image)
-        
-        # Convert sets to sorted tuples for each hyperedge in scenes
-        scenes = {key: tuple(sorted(images)) for key, images in scenes.items()}
-        
+                for hyperedge_name in image_mapping[image]:
+                    # Only include this hyperedge if it's in 'filtered_hyperedges'
+                    if hyperedge_name in valid_hyperedges:
+                        scenes[hyperedge_name].add(image)
+
+        # Convert sets to sorted tuples
+        scenes = {
+            h_name: tuple(sorted(imgs))
+            for h_name, imgs in scenes.items()
+        }
+
         return scenes
 
-    
 
 
 
     def create_overview(self):
+        if hasattr(self, 'canvasG') and self.canvasG is not None:
+            self.canvasG.get_tk_widget().destroy()
+            self.canvasG = None  # not strictly required, but helps avoid stale references
         # Initialize UMAP if not done
         if len(self.umap_features) < 1:
             modelu = umap.UMAP()
@@ -944,6 +1030,8 @@ class Application(Frame,object):
             self.umap_features[:, 0] = self.umap_features[:, 0] / np.max(self.umap_features[:, 0])
             self.umap_features[:, 1] = self.umap_features[:, 1] / np.max(self.umap_features[:, 1])
             self.umap_pos = {i: tuple(pos) for i, pos in enumerate(self.umap_features)}
+
+        self.apply_filter()
 
         # Set initial zoom scale factor
         self.scale_factor = 1.1  # This controls the zoom intensity per scroll
@@ -961,6 +1049,14 @@ class Application(Frame,object):
         self.canvasG.get_tk_widget().pack(side=TOP, fill=BOTH, expand=True)
         # self.canvasG.pack(side=TOP, fill=BOTH, expand=TRUE)
         # Draw initial hypergraph
+        
+
+
+
+        # sample_indices = self.farthest_point_sampling(self.filtered_umap_features, n_samples=25)
+
+
+
         self.redraw_hypergraph()  # Now this can safely use self.canvas
         
         # Draw the initial canvas content
@@ -973,8 +1069,32 @@ class Application(Frame,object):
         self.canvasG.get_tk_widget().bind("<ButtonRelease-1>", self.end_pan)
 
         
+    def get_allowed_indices_from_filter(self):
+        # If user has selected "exclude" edges -> create excluded_scenes, etc.
+        # Or "include" edges -> create included_scenes.
+        # Then gather the union of images from the resulting scenes.
+        if self.chosen_edges.index("end") == 0:
+            allowed_indices = np.arange(0,len(self.umap_features))
+            return allowed_indices
+
+        chosen_edges = self.chosen_edges.get(0,"end")
+        
+        if self.filter_mode.get() == "exclude":
+            allowed_indices = [
+                img
+                for edge_name, images in self.hyperedges.items()                    
+                if edge_name not in chosen_edges
+                for img in images
+            ]
 
 
+        else:
+            allowed_indices = [
+                img
+                for edge_name in chosen_edges
+                for img in self.hyperedges[edge_name]
+            ]
+        return allowed_indices
 
 
     def start_pan(self, event):
@@ -1085,33 +1205,22 @@ class Application(Frame,object):
 
 
         if zoom_out:
-            # Step 1: Resample current bounding box
-
-            # visible_points = [
-            #     i for i, (x, y) in enumerate(self.umap_features)
-            #     if xlim[0] <= x <= xlim[1] and ylim[0] <= y <= ylim[1]
-            # ]
-            visible_points = []
-            for i, (x, y) in enumerate(self.umap_features):
-                # Check if the x-coordinate is within the x-axis limits
-                if xlim[0] <= x <= xlim[1]:
-                    # Check if the y-coordinate is within the y-axis limits
-                    if ylim[0] <= y <= ylim[1]:
-                        # Add the index to visible_points if both conditions are met
-                        visible_points.append(i)
+            visible_points = [
+                i for i, (x, y) in enumerate(self.filtered_umap_features)
+                if xlim[0] <= x <= xlim[1] and ylim[0] <= y <= ylim[1]
+            ]
             
             visible_points = np.array(visible_points)
-            vis_pts_umap = self.umap_features[visible_points]
-            # sampled_indices = self.farthest_point_sampling(
-            #     [self.umap_features[i] for i in visible_points], n_samples=25
-            # )
-            sampled_items = self.farthest_point_sampling(vis_pts_umap, n_samples=25)
+            vis_pts_umap = self.filtered_umap_features[visible_points]
+            n_samples = min(25, len(vis_pts_umap))
+            sampled_items = self.farthest_point_sampling(vis_pts_umap, n_samples=n_samples)
+
             sampled_indices = visible_points[sampled_items]
             # Step 2: Count how many of the new samples fall within the old bounding box
             within_old_box = [
                 i for i in sampled_indices
-                if (self.previous_xlim[0] <= self.umap_features[i][0] <= self.previous_xlim[1] and
-                    self.previous_ylim[0] <= self.umap_features[i][1] <= self.previous_ylim[1])
+                if (self.previous_xlim[0] <= self.filtered_umap_features[i][0] <= self.previous_xlim[1] and
+                    self.previous_ylim[0] <= self.filtered_umap_features[i][1] <= self.previous_ylim[1])
             ]
             count_within_old_box = len(within_old_box)
             # Step 3: Choose that many points from previous_visible_points
@@ -1124,18 +1233,17 @@ class Application(Frame,object):
             ][:25 - len(retained_points)]
 
             # Final sample combining old and new points
-            sample_indices = retained_points + additional_points
+            sample_indices = list(retained_points) + list(additional_points)
 
         else:
             # For zoom-in or regular behavior, keep standard sampling
             visible_points = [
-                i for i, (x, y) in enumerate(self.umap_features)
+                i for i, (x, y) in enumerate(self.filtered_umap_features)
                 if xlim[0] <= x <= xlim[1] and ylim[0] <= y <= ylim[1]
             ]
 
             # Retain points from the previous selection that are still visible
             retained_points = [i for i in self.previous_visible_points if i in visible_points]
-
             # Calculate the number of additional points needed
             points_needed = max(0, 25 - len(retained_points))
 
@@ -1145,24 +1253,27 @@ class Application(Frame,object):
                 additional_points = new_visible_points
             else:
                 sampled_indices = self.farthest_point_sampling(
-                    [self.umap_features[i] for i in new_visible_points],
+                    [self.filtered_umap_features[i] for i in new_visible_points],
                     n_samples=points_needed
                 )
                 additional_points = [new_visible_points[i] for i in sampled_indices]
+            
 
-            sample_indices = retained_points + additional_points
+            sample_indices = list(retained_points) + list(additional_points)
 
 
         # Store current limits as previous for the next call
         self.previous_xlim = xlim
         self.previous_ylim = ylim
+        # sample_indices = self.all_filtered_images[sample_indices]
+        
         # Update the previous visible points for the next zoom event
-        self.previous_visible_points = sample_indices
+        self.previous_visible_points = sample_indices  ## probably need to make sure it is the correct indices...from self.all_images or something
         # Create a new hypergraph and redraw
         self.scenes = self.create_scenes_from_samples(sample_indices, self.image_mapping)
         # scenes = self.create_scenes_from_samples(sampled_indices, self.image_mapping)
 
-        self.redraw_hypergraph(self.scenes)
+        self.redraw_hypergraph('update')
 
     def calculate_image_sizes(self, points, base_size=200):
         # Fit nearest neighbors in data coordinates
@@ -1185,25 +1296,18 @@ class Application(Frame,object):
         display_distances = nearest_distances / np.sqrt((data_width / fig_width) ** 2 + (data_height / fig_height) ** 2)
 
         # Scale image sizes and clip to defined range
-        image_sizes = np.clip(display_distances / 2, 20, base_size)  # Adjust as needed
+        image_sizes = np.clip(display_distances / 2, 40, base_size)  # Adjust as needed
 
         return image_sizes
 
 
-    def redraw_hypergraph(self, scenes=None):
+    def redraw_hypergraph(self,update=None):
         # Capture the current view limits
         current_xlim = self.ax.get_xlim()
         current_ylim = self.ax.get_ylim()
-        if scenes is None:
-            sample_indices = self.farthest_point_sampling(self.umap_features, n_samples=25)
-            self.scenes = self.create_scenes_from_samples(sample_indices, self.image_mapping)
-            self.previous_visible_points = sample_indices
+        
         # Clear old hypergraph layers, leaving only the most recent layer
             
-     
-     
-
-
         if len(self.ax.collections) > 3:
             self.ax.collections[0].remove()  # Removes the oldest layer in `collections`
             self.ax.collections[0].remove()
@@ -1218,6 +1322,21 @@ class Application(Frame,object):
             self.ax.texts[0].remove()  # Removes the oldest hyperedge label
         # Create and draw the updated hypergraph
         
+        #waaaaaaa
+        # sample_indices = []
+        # all_filtered_images = np.array([img for images in self.filtered_hyperedges.values() for img in images])
+                
+        # self.filtered_umap_features = self.umap_features[all_filtered_images]
+        if update:
+            pass
+
+        else:
+        
+            # sample_indices = self.all_filtered_images[self.farthest_point_sampling(self.filtered_umap_features, n_samples=25)]
+            sample_indices = self.farthest_point_sampling(self.filtered_umap_features, n_samples=25)
+            self.previous_visible_points = sample_indices
+            
+            self.scenes = self.create_scenes_from_samples(sample_indices, self.image_mapping)
         
         H = hnx.Hypergraph(self.scenes)
         # print(H.nodes.to_dataframe)
@@ -1238,14 +1357,15 @@ class Application(Frame,object):
         self.ax.set_xlim(current_xlim)
         self.ax.set_ylim(current_ylim)
         self.ax.axis("on")
-        self.ax.scatter(self.umap_features[:,0],self.umap_features[:,1],c='black')
+        self.ax.scatter(self.filtered_umap_features[:,0],self.filtered_umap_features[:,1],c='black')
         with h5py.File(self.hdf_path, 'r') as hdf:
             for image_box in self.image_boxes:
                 image_box.remove()  # Remove each previous AnnotationBbox from the plot
             self.image_boxes.clear()
-            visible_points = [self.umap_features[i] for i in self.previous_visible_points]
+            previous_visible_points = self.all_filtered_images[self.previous_visible_points]
+            visible_points = [self.umap_features[i] for i in previous_visible_points]
             image_sizes = self.calculate_image_sizes(visible_points)  # Calculate adaptive image sizes
-            for idx, img_idx in enumerate(self.previous_visible_points):
+            for idx, img_idx in enumerate(previous_visible_points):
                 # Get the (x, y) location for the image from umap_features
                 x, y = self.umap_features[img_idx]
 
@@ -1257,14 +1377,13 @@ class Application(Frame,object):
                 # Create OffsetImage and add it to the plot
                 offset_img = OffsetImage(thumbnail, zoom=1)
                 if hasattr(self, 'selected_he_image_id') and img_idx == self.selected_he_image_id:
-                    print('it does!')
                     # Draw a blue border around the selected image
                     image_box = AnnotationBbox(
                         offset_img,
                         (x, y),
                         frameon=True,
                         box_alignment=(0.5, 0.5),
-                        bboxprops={"edgecolor": "skyblue", "linewidth": 5}
+                        bboxprops={"edgecolor": "dodgerblue", "linewidth": 2}
                     )
                     image_box.set_zorder(1000)
                 else:
@@ -1368,7 +1487,6 @@ class Application(Frame,object):
 
 
     def scroll_to_selected_image(self):
-        print('wazzap')
         # Make sure we have a selected image
         if not hasattr(self, 'selected_image_id'):
             return
@@ -1457,11 +1575,9 @@ class Application(Frame,object):
     def click_select_in_overlapping_hyperedges(self, event):
         """
         Right-click handler for the overlapping hyperedge canvas.
-        This is an example; integrate with your existing event system.
         """
         if event.num == 3:  # Right-click
             canvas = event.widget
-            print(canvas)
             x = canvas.canvasx(event.x)
             y = canvas.canvasy(event.y)
             
@@ -1475,23 +1591,21 @@ class Application(Frame,object):
                         image_idx = int(t)
                         break
                 if image_idx is not None:
-                    # We also need to know which hyperedge this canvas corresponds to
-                    # Assuming each hyperedge_canvas is appended in the same order as hyperedges:
-                    # and we stored `hyperedge_frames` or have a way to index `self.hyperedge_canvases`
+                    # Determine which hyperedge this canvas corresponds to
                     hyperedge_index = self.hyperedge_canvases.index(canvas)
                     
-                    # If linked mode:
+                    # Linked mode
                     if self.linked.var.get():
-                        # For linked mode, hyperedges come from self.scenes.
-                        # Find the hyperedge_id by enumerating self.scenes
-                        hyperedge_id = list(self.scenes.keys())[hyperedge_index]
-                        hyperedge_key = f"edge_{hyperedge_id}"
+                        # Scenes is presumably a dict: {hyperedge_name: set_of_images, ...}
+                        # We can get the hyperedge name directly:
+                        hyperedge_name = list(self.scenes.keys())[hyperedge_index]
                     else:
-                        # Non-linked mode: from self.overlapping_hyperedges and self.edge_ids
-                        # hyperedge_index corresponds to self.overlapping_hyperedges[hyperedge_index]
-                        hyperedge_key = self.edge_ids[hyperedge_index]
+                        # Non-linked mode: using self.edge_ids, which should store the actual hyperedge names
+                        hyperedge_name = self.edge_ids[hyperedge_index]
 
-                    self.focus_on_image_in_projection(image_idx, hyperedge_key)
+                    # Then call your focus function with the actual hyperedge name
+                    self.focus_on_image_in_projection(image_idx, hyperedge_name)
+
 
 
     def focus_on_image_in_projection(self, image_idx, hyperedge_key):
@@ -1502,7 +1616,7 @@ class Application(Frame,object):
         """
 
         # Get all images of that hyperedge
-        hyperedge_images = self.hyperedges[hyperedge_key]
+        hyperedge_images = self.filtered_hyperedges[hyperedge_key]
         hyperedge_images = list(map(int, hyperedge_images))
 
         # Compute bounding box of hyperedge images in the UMAP projection
@@ -1534,7 +1648,7 @@ class Application(Frame,object):
 
         # Find visible points based on current axes
         visible_points = [
-            i for i, (x, y) in enumerate(self.umap_features)
+            i for i, (x, y) in enumerate(self.filtered_umap_features)
             if xlim[0] <= x <= xlim[1] and ylim[0] <= y <= ylim[1]
         ]
 
@@ -1548,8 +1662,8 @@ class Application(Frame,object):
         # We want to pick 25 images, ensuring image_idx is included.
         # Let's use farthest_point_sampling:
         # We'll pass the selected image's position as an initial sample.
-        visible_positions = self.umap_features[visible_points]
-        selected_pos = [self.umap_features[image_idx]]  # initial sample
+        visible_positions = self.filtered_umap_features[visible_points]
+        selected_pos = [self.filtered_umap_features[image_idx]]  # initial sample
 
         # Perform farthest point sampling:
         # n_samples = 25 total, 1 is already the selected image, so we provide initial_samples
@@ -1572,6 +1686,136 @@ class Application(Frame,object):
         self.scenes = self.create_scenes_from_samples(self.previous_visible_points, self.image_mapping)
         # Redraw hypergraph
         self.redraw_hypergraph(self.scenes)
+
+
+    def add_to_chosen_edges(self):
+        """
+        Adds the currently selected hyperedges from self.categories
+        into the second listbox self.chosen_edges (if not already present).
+        """
+        
+        selections = self.categories.curselection()
+        for sel in selections:
+            edge_name = self.categories.get(sel)
+            # Prevent duplicates
+            if edge_name not in self.chosen_edges.get(0, END):
+                self.chosen_edges.insert(END, edge_name)
+        
+        # Optionally apply the filter immediately after adding
+        # self.apply_filter()
+
+
+    def remove_from_chosen_edges(self):
+        """
+        Removes the currently selected hyperedges from self.chosen_edges.
+        """
+        selections = list(self.chosen_edges.curselection())
+        # Because removing items changes indices, reverse the list so we remove from the bottom up
+        selections.reverse()
+        for sel in selections:
+            self.chosen_edges.delete(sel)
+
+        # Optionally apply the filter immediately after removing
+        # self.apply_filter()
+
+    def apply_filter(self):
+        """
+        Reads self.filter_mode (exclude/include) and the hyperedges in self.chosen_edges,
+        then filters self.scenes accordingly and calls redraw_hypergraph.
+        """
+        if self.chosen_edges.index("end") == 0:
+            self.filtered_hyperedges = self.hyperedges
+            self.filtered_umap_features = self.umap_features
+            all_imgs = set()
+            for images in self.filtered_hyperedges.values():
+                all_imgs.update(images)
+            self.all_filtered_images = np.array(sorted(all_imgs))
+            return
+        
+        chosen_edges = self.chosen_edges.get(0,"end")
+        mode = self.filter_mode.get()
+
+        if mode == "exclude":
+            self.filtered_hyperedges = {
+                edge_name: images
+                for edge_name, images in self.hyperedges.items()
+                if edge_name not in chosen_edges
+            }
+        else:
+            # mode == "include"
+            self.filtered_hyperedges = {
+                edge_name: self.hyperedges[edge_name]
+                for edge_name in chosen_edges
+                if edge_name in self.hyperedges
+            }
+
+        # self.all_filtered_images = np.array([img for images in self.filtered_hyperedges.values() for img in images])   
+        all_imgs = set()
+        for images in self.filtered_hyperedges.values():
+            all_imgs.update(images)
+        self.all_filtered_images = np.array(sorted(all_imgs))
+
+        self.filtered_umap_features = self.umap_features[self.all_filtered_images]
+
+
+    def exclude_scenes(self, scenes_dict, edges_to_exclude):
+        """
+        Returns a new scenes dictionary that excludes the given hyperedges,
+        and also excludes images that are present *only* in those hyperedges.
+        """
+        excluded_set = set(edges_to_exclude)
+        filtered_scenes = {}
+
+        for he_name, images in scenes_dict.items():
+            # If this hyperedge is excluded, skip it
+            if he_name in excluded_set:
+                continue
+
+            # Otherwise, keep it but filter out images that belong *only* to excluded edges
+            kept_images = []
+            for img in images:
+                # Find all hyperedges that contain this image
+                edges_for_img = set(self.image_mapping[img])
+
+                # If edges_for_img is entirely within excluded_set,
+                # that means this image has nowhere else to appear -> exclude it.
+                if edges_for_img.issubset(excluded_set):
+                    # discard this image
+                    continue
+                else:
+                    kept_images.append(img)
+
+            # Keep the hyperedge if there's at least one image left
+            if kept_images:
+                filtered_scenes[he_name] = tuple(kept_images)
+
+        return filtered_scenes
+
+    def include_scenes(self, scenes_dict, edges_to_include):
+        """
+        Returns a new scenes dictionary that ONLY includes the given hyperedges,
+        and by definition, only includes images in those edges.
+        """
+        included_set = set(edges_to_include)
+        filtered_scenes = {}
+
+        for he_name, images in scenes_dict.items():
+            # Keep only the edges that are explicitly in included_set
+            if he_name in included_set:
+                filtered_scenes[he_name] = images
+
+        return filtered_scenes
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2520,6 +2764,7 @@ class Application(Frame,object):
                 if i_idx not in self.image_mapping:
                     self.image_mapping[i_idx] = set()
                 self.image_mapping[i_idx].add(hyperedge_name)
+        self.filtered_hyperedges = self.hyperedges
 
 
 
@@ -3424,7 +3669,7 @@ class Application(Frame,object):
         
         # Remove the selected hyperedge from the set of overlapping hyperedges
         overlapping_hyperedges.discard(self.selected_edge)
-        
+        print(overlapping_hyperedges)
         # Prepare a list to store hyperedge data
         self.overlapping_hyperedges = []
         edge_ids = []
@@ -3666,13 +3911,12 @@ class Application(Frame,object):
 
         elif self.linked.var.get() == True:
             # For each hyperedge in self.scenes, create a canvas and display images
-            for he_id, (hyperedge_id, _) in enumerate(self.scenes.items()):
-                # Find the corresponding full hyperedge key in self.hyperedges
-                full_hyperedge_key = f"edge_{hyperedge_id}"
+            for he_id, (hyperedge_name, hyperedge_data) in enumerate(self.scenes.items()):
+                # hyperedge_name is already the real key (no need to do f"edge_{hyperedge_id}")
                 
                 # Retrieve all images belonging to the current hyperedge
-                if full_hyperedge_key in self.hyperedges:
-                    images = self.hyperedges[full_hyperedge_key]
+                if hyperedge_name in self.filtered_hyperedges:
+                    images = self.filtered_hyperedges[hyperedge_name]
                 else:
                     continue  # Skip if the hyperedge is not found
 
@@ -3685,7 +3929,7 @@ class Application(Frame,object):
                     reordered_images = reordered_images[:100]
 
                 # Label for the hyperedge
-                label = Label(frame, text=f"Hyperedge {hyperedge_id}", bg='#555555', fg='white', font=('Arial', 14))
+                label = Label(frame, text=hyperedge_name, bg='#555555', fg='white', font=('Arial', 14))
                 label.grid(row=row_idx, column=0, sticky='ew', padx=10, pady=5)
                 row_idx += 1
 
@@ -3786,7 +4030,7 @@ class Application(Frame,object):
                     bbox = canvas.bbox(for_bb)
                     rect = canvas.create_rectangle(
                         bbox,
-                        outline='skyblue',
+                        outline='dodgerblue',
                         width=3,
                         tags='selected_tag'
                     )
@@ -3798,7 +4042,60 @@ class Application(Frame,object):
         self.hyperedge_preparation()
         self.display_images(self.edge_images)
         self.display_overlapping_hyperedges()
-        # self.display_matrix()
+        self.display_matrix()
+
+        # mview = SyncScrollExample(self.matrixWindow, self.images_in_selected, self.all_edges, self.hyperedges, self.hdf_path)  # Try bigger row_count
+        # mview.pack(fill="both", expand=True)
+
+    def rename_hyperedge(self):
+        """
+        Renames the hyperedge selected in the listbox to the text in self.e2
+        and updates self.hyperedges and self.image_mapping accordingly.
+        """
+        # 1. Get the currently selected index (or indices).
+        selected_index = self.categories.curselection()
+        if len(selected_index) != 1:           
+            return
+
+        # 2. Get the old hyperedge name from the listbox
+        old_name = self.categories.get(selected_index)
+
+        # 3. Get the new name from the Entry widget
+        new_name = self.e2.get().strip()
+        if not new_name:
+            # If the user left it empty or just spaces, do nothing
+            return
+
+        if new_name != old_name:
+            existing_names = self.categories.get(0, "end")  # all names in the Listbox
+            if new_name in existing_names:
+                # Option A: just return
+                return
+
+        # 4. Rename in the Listbox:
+        #    Remove the old entry, then re-insert at the same position with the new name.
+        self.categories.delete(selected_index)
+        self.categories.insert(selected_index, new_name)
+
+        # 5. Rename the key in self.hyperedges dictionary:
+        #    We'll move the set of image indices from old_name to new_name.
+        #    Then delete the old key.
+        if old_name in self.hyperedges:
+            self.hyperedges[new_name] = self.hyperedges.pop(old_name)
+        else:
+            return
+        # if old_name in self.filtered_hyperedges:
+        #     self.filtered_hyperedges[new_name] = self.filtered_hyperedges.pop(old_name)
+        # else:
+        #     print('what2')
+        #     print('he2',self.filtered_hyperedges)
+        #     return
+        # 6. Update self.image_mapping so that any images belonging to the old_name
+        #    now belong to new_name instead.
+        for i_idx, edge_set in self.image_mapping.items():
+            if old_name in edge_set:
+                edge_set.remove(old_name)
+                edge_set.add(new_name)
 
     def remove_selected_image_from_hyperedge(self):
         if self.selected_images == None:
@@ -3826,6 +4123,88 @@ class Application(Frame,object):
             if len(self.image_mapping[i_idx]) == 0:
                 del self.image_mapping[i_idx]
 
+
+    def show_matrix(self):
+
+        # main_frame = Frame(self.matrixWindow)
+        # main_frame.pack(fill='both', expand=True)
+
+        # # Create a frame for the table on the right
+        # table_frame = Frame(main_frame)
+        # table_frame.pack(side='right', fill='both', expand=True)
+
+        # # Create a frame for the image panel on the left
+        # image_frame = Frame(main_frame)
+        # image_frame.pack(side='left', fill='y')
+
+        # # Create the image panel on the left
+        # self.image_panel = LazyImagePanel(
+        #     image_frame,
+        #     images_in_selected=self.images_in_selected,
+        #     row_height=100,
+        #     hdf_path=self.hdf_path
+        # )
+        # self.image_panel.pack(side="left", fill="both", expand=False)
+
+        data = {}
+        for image in self.images_in_selected:
+            row_dict = {}   
+            row_dict['label'] = str(image)  # display image as row label
+
+            for edge in self.all_edges:
+                row_dict[edge] = '1' if image in self.hyperedges[edge] else '0'
+            
+            data[image] = row_dict
+
+        # Create a model from this data
+        model = TableModel()
+        model.importDict(data)
+        mview = SyncScrollExample(self.matrixWindow, self.images_in_selected, self.all_edges, self.hyperedges, self.hdf_path, data, model)  # Try bigger row_count
+        mview.grid(row=0, column=0, sticky="nsew")
+
+        # Configure grid layout in self.matrixWindow
+        self.matrixWindow.grid_columnconfigure(0, weight=1)
+        self.matrixWindow.grid_rowconfigure(0, weight=1)
+
+        # Create the table
+        # table = TableCanvas(
+        #     parent       = table_frame,
+        #     model        = model,
+        #     showkeynames = False,   # Show row label from 'label' field
+        #     rowheaderwidth=100,
+        #     cellwidth    = 60,
+        #     thefont      = ('Arial', 12),
+        #     rowheight    = 100,
+        #     bgcolor      = '#555555',
+        #     editable     = False,            
+            
+        # )
+        # table.bgcolor = '#555555'
+        # #table.setbgcolor()
+        # # Render the table first so rows and columns are set up
+        # table.show()
+
+        # # Now color cells with value '1' in 'seagreen'
+        # for image_key, row_dict in data.items():
+        #     # Get the row index for this image
+        #     row_index = table.model.getRecordIndex(image_key)
+
+        #     for col_name, val in row_dict.items():
+        #         if col_name == 'label':
+        #             col_index = table.model.columnNames.index(col_name)
+        #             table.model.setColorAt(row_index, col_index, color='#555555',key='bg')  
+        #         if val == '1':
+        #             # Find column index
+        #             col_index = table.model.columnNames.index(col_name)
+        #             # Set background color for this cell
+        #             table.model.setColorAt(row_index, col_index, color='seagreen',key='bg')
+        #         else:
+        #             col_index = table.model.columnNames.index(col_name)
+        #             # Set background color for this cell
+        #             table.model.setColorAt(row_index, col_index, color='#555555',key='bg')
+        # # Redraw the table to show the new colors
+        # table.redraw()
+
     def display_matrix(self):
         # Clear previous contents from the matrixWindow
         for widget in self.matrixWindow.winfo_children():
@@ -3840,83 +4219,85 @@ class Application(Frame,object):
             images_in_selected = set(list(images_in_selected)[:200])
         # Sort all edges and filter out the selected_edge so it is not displayed as a column
         all_edges = [e for e in sorted(self.hyperedges.keys()) if e != selected_edge]
-
+        self.all_edges = all_edges
+        self.images_in_selected = images_in_selected
+        self.show_matrix()
         # Create a canvas and a frame inside it to enable scrolling
-        canvas = Canvas(self.matrixWindow, borderwidth=0, bg="#555555", highlightthickness=0)
-        scroll_y = Scrollbar(self.matrixWindow, orient="vertical", command=canvas.yview)
-        frame = Frame(canvas, bg="#555555")
+        # canvas = Canvas(self.matrixWindow, borderwidth=0, bg="#555555", highlightthickness=0)
+        # scroll_y = Scrollbar(self.matrixWindow, orient="vertical", command=canvas.yview)
+        # frame = Frame(canvas, bg="#555555")
 
-        # Associate the frame with the canvas for scrolling
-        frame_id = canvas.create_window((0,0), window=frame, anchor="nw")
+        # # Associate the frame with the canvas for scrolling
+        # frame_id = canvas.create_window((0,0), window=frame, anchor="nw")
 
-        # Configure canvas to use scrollbar
-        canvas.config(yscrollcommand=scroll_y.set)
-        scroll_y.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
+        # # Configure canvas to use scrollbar
+        # canvas.config(yscrollcommand=scroll_y.set)
+        # scroll_y.pack(side="right", fill="y")
+        # canvas.pack(side="left", fill="both", expand=True)
 
-        # Update scroll region on size changes
-        def update_scroll_region(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        frame.bind("<Configure>", update_scroll_region)
+        # # Update scroll region on size changes
+        # def update_scroll_region(event):
+        #     canvas.configure(scrollregion=canvas.bbox("all"))
+        # frame.bind("<Configure>", update_scroll_region)
 
-        # Mouse wheel scrolling
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        # # Mouse wheel scrolling
+        # def _on_mousewheel(event):
+        #     canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
-        # Bind mousewheel to canvas for scrolling when mouse is over the canvas
-        canvas.focus_set()
-        canvas.bind("<MouseWheel>", _on_mousewheel)
+        # # Bind mousewheel to canvas for scrolling when mouse is over the canvas
+        # canvas.focus_set()
+        # canvas.bind("<MouseWheel>", _on_mousewheel)
 
-        # Optional: Use enter/leave bindings if needed for more reliable scrolling
-        # def _bound_to_mousewheel(event):
-        #     canvas.bind_all("<MouseWheel>", _on_mousewheel)
-        # def _unbound_to_mousewheel(event):
-        #     canvas.unbind_all("<MouseWheel>")
-        # frame.bind('<Enter>', _bound_to_mousewheel)
-        # frame.bind('<Leave>', _unbound_to_mousewheel)
+        # # Optional: Use enter/leave bindings if needed for more reliable scrolling
+        # # def _bound_to_mousewheel(event):
+        # #     canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # # def _unbound_to_mousewheel(event):
+        # #     canvas.unbind_all("<MouseWheel>")
+        # # frame.bind('<Enter>', _bound_to_mousewheel)
+        # # frame.bind('<Leave>', _unbound_to_mousewheel)
 
-        # Create header row (excluding the selected edge)
-        header_label = Label(frame, text="Image", font=("Arial", 12, "bold"), bg="#555555", fg="white")
-        header_label.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+        # # Create header row (excluding the selected edge)
+        # header_label = Label(frame, text="Image", font=("Arial", 12, "bold"), bg="#555555", fg="white")
+        # header_label.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
 
-        for col_idx, edge in enumerate(all_edges, start=1):
-            header_label = Label(frame, text=edge, font=("Arial", 12, "bold"), bg="#555555", fg="white")
-            header_label.grid(row=0, column=col_idx, sticky="nsew", padx=2, pady=2)
+        # for col_idx, edge in enumerate(all_edges, start=1):
+        #     header_label = Label(frame, text=edge, font=("Arial", 12, "bold"), bg="#555555", fg="white")
+        #     header_label.grid(row=0, column=col_idx, sticky="nsew", padx=2, pady=2)
 
-        # Load and display images, membership
-        with h5py.File(self.hdf_path, 'r') as hdf:
-            self.my_matrix_img = []
-            for row_idx, img in enumerate(images_in_selected, start=1):
-                # Load and resize image
-                load = Image.fromarray(np.array(hdf.get('thumbnail_images')[img], dtype='uint8'))
-                load = load.resize((100, 100), Image.Resampling.LANCZOS)
-                render = ImageTk.PhotoImage(load)
-                self.my_matrix_img.append(render)
+        # # Load and display images, membership
+        # with h5py.File(self.hdf_path, 'r') as hdf:
+        #     self.my_matrix_img = []
+        #     for row_idx, img in enumerate(images_in_selected, start=1):
+        #         # Load and resize image
+        #         load = Image.fromarray(np.array(hdf.get('thumbnail_images')[img], dtype='uint8'))
+        #         load = load.resize((100, 100), Image.Resampling.LANCZOS)
+        #         render = ImageTk.PhotoImage(load)
+        #         self.my_matrix_img.append(render)
 
-                # Display image cell with #555555 background
-                img_label = Label(frame, image=render, width=100, height=100, bg="#555555")
-                img_label.grid(row=row_idx, column=0, sticky="nsew", padx=2, pady=2)
+        #         # Display image cell with #555555 background
+        #         img_label = Label(frame, image=render, width=100, height=100, bg="#555555")
+        #         img_label.grid(row=row_idx, column=0, sticky="nsew", padx=2, pady=2)
 
-                # Membership columns (excluding selected_edge)
-                for col_idx, edge in enumerate(all_edges, start=1):
-                    value = "1" if img in self.hyperedges[edge] else "0"
+        #         # Membership columns (excluding selected_edge)
+        #         for col_idx, edge in enumerate(all_edges, start=1):
+        #             value = "1" if img in self.hyperedges[edge] else "0"
                     
-                    # Default bg is #555555, if 1 then green
-                    cell_bg = "green" if value == "1" else "#555555"
+        #             # Default bg is #555555, if 1 then green
+        #             cell_bg = "green" if value == "1" else "#555555"
                     
-                    cell = Label(frame, text=value, font=("Arial", 10), width=3, height=2, bg=cell_bg, fg="white")
-                    cell.grid(row=row_idx, column=col_idx, sticky="nsew", padx=2, pady=2)
+        #             cell = Label(frame, text=value, font=("Arial", 10), width=3, height=2, bg=cell_bg, fg="white")
+        #             cell.grid(row=row_idx, column=col_idx, sticky="nsew", padx=2, pady=2)
 
-        total_cols = len(all_edges) + 1
-        for c in range(total_cols):
-            frame.grid_columnconfigure(c, weight=1)
+        # total_cols = len(all_edges) + 1
+        # for c in range(total_cols):
+        #     frame.grid_columnconfigure(c, weight=1)
 
-        total_rows = len(images_in_selected) + 1
-        for r in range(total_rows):
-            frame.grid_rowconfigure(r, weight=0)
+        # total_rows = len(images_in_selected) + 1
+        # for r in range(total_rows):
+        #     frame.grid_rowconfigure(r, weight=0)
 
-        canvas.update_idletasks()
-        canvas.config(scrollregion=canvas.bbox("all"))
+        # canvas.update_idletasks()
+        # canvas.config(scrollregion=canvas.bbox("all"))
 
 
 
