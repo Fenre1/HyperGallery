@@ -80,7 +80,7 @@ from threading import Timer
 # from VirtualMatrix import VirtualMatrix, create_frozen_header
 from matrix_view import LazyImagePanel, SyncScrollExample
 from tkintertable import TableCanvas, TableModel
-from synced_table_canvas import SyncedTableCanvas
+# from synced_table_canvas import SyncedTableCanvas
 #import clip ## only if model used is clip... 
 
 batch_size  = 8
