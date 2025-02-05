@@ -1580,7 +1580,7 @@ class Application(Frame,object):
             canvas = event.widget
             x = canvas.canvasx(event.x)
             y = canvas.canvasy(event.y)
-            
+            print(canvas)
             # Find the clicked item on the canvas
             clicked_item = canvas.find_closest(x, y)
             if clicked_item:
@@ -1590,6 +1590,7 @@ class Application(Frame,object):
                     if t.isdigit():
                         image_idx = int(t)
                         break
+                print(image_idx)
                 if image_idx is not None:
                     # Determine which hyperedge this canvas corresponds to
                     hyperedge_index = self.hyperedge_canvases.index(canvas)
@@ -1605,6 +1606,41 @@ class Application(Frame,object):
 
                     # Then call your focus function with the actual hyperedge name
                     self.focus_on_image_in_projection(image_idx, hyperedge_name)
+
+    def click_select_in_matrix(self, event):
+        """
+        Right-click handler for the overlapping hyperedge canvas.
+        """
+        if event.num == 3:  # Right-click
+            canvas = event.widget
+            x = canvas.canvasx(event.x)
+            y = canvas.canvasy(event.y)
+            print(canvas)
+            # Find the clicked item on the canvas
+            clicked_item = canvas.find_closest(x, y)
+            if clicked_item:
+                tags = canvas.gettags(clicked_item)
+                image_idx = None
+                for t in tags:
+                    if t.isdigit():
+                        image_idx = int(t)
+                        break
+                print(image_idx)
+                if image_idx is not None:
+                    # Determine which hyperedge this canvas corresponds to
+                    # hyperedge_index = self.hyperedge_canvases.index(canvas)
+                    
+                    # # Linked mode
+                    # if self.linked.var.get():
+                    #     # Scenes is presumably a dict: {hyperedge_name: set_of_images, ...}
+                    #     # We can get the hyperedge name directly:
+                    #     hyperedge_name = list(self.scenes.keys())[hyperedge_index]
+                    # else:
+                    #     # Non-linked mode: using self.edge_ids, which should store the actual hyperedge names
+                    #     hyperedge_name = self.edge_ids[hyperedge_index]
+    
+                    # Then call your focus function with the actual hyperedge name
+                    self.focus_on_image_in_projection(image_idx, self.selected_edge)
 
 
 
@@ -4161,7 +4197,7 @@ class Application(Frame,object):
         model.importDict(data)
         mview = SyncScrollExample(self.matrixWindow, self.images_in_selected, self.all_edges, self.hyperedges, self.hdf_path, data, model)  # Try bigger row_count
         mview.grid(row=0, column=0, sticky="nsew")
-
+        self.matrixWindow.bind('<Button-3>', self.click_select_in_matrix)
         # Configure grid layout in self.matrixWindow
         self.matrixWindow.grid_columnconfigure(0, weight=1)
         self.matrixWindow.grid_rowconfigure(0, weight=1)
