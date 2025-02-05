@@ -109,7 +109,7 @@ class LazyImagePanel(tk.Frame):
 
         # 3) Draw it in the canvas
         item_id = self.canvas.create_image(
-            10, y_center, anchor="w", image=tk_img
+            10, y_center, anchor="w", image=tk_img, tags=(img_id)
         )
         self.active_rows[r] = item_id
 
