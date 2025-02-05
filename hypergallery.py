@@ -1627,20 +1627,8 @@ class Application(Frame,object):
                         break
                 print(image_idx)
                 if image_idx is not None:
-                    # Determine which hyperedge this canvas corresponds to
-                    # hyperedge_index = self.hyperedge_canvases.index(canvas)
-                    
-                    # # Linked mode
-                    # if self.linked.var.get():
-                    #     # Scenes is presumably a dict: {hyperedge_name: set_of_images, ...}
-                    #     # We can get the hyperedge name directly:
-                    #     hyperedge_name = list(self.scenes.keys())[hyperedge_index]
-                    # else:
-                    #     # Non-linked mode: using self.edge_ids, which should store the actual hyperedge names
-                    #     hyperedge_name = self.edge_ids[hyperedge_index]
-    
-                    # Then call your focus function with the actual hyperedge name
-                    self.focus_on_image_in_projection(image_idx, self.selected_edge)
+                    if len(self.umap_features) > 0:
+                        self.focus_on_image_in_projection(image_idx, self.selected_edge)
 
 
 
