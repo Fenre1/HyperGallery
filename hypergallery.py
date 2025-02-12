@@ -78,7 +78,7 @@ from sklearn.neighbors import NearestNeighbors
 from threading import Timer
 
 # from VirtualMatrix import VirtualMatrix, create_frozen_header
-from matrix_view import LazyImagePanel, SyncScrollExample
+from matrix_view import LazyImagePanel, SyncScrollExample, HyperedgeConfusionMatrix
 from tkintertable import TableCanvas, TableModel
 # from synced_table_canvas import SyncedTableCanvas
 #import clip ## only if model used is clip... 
@@ -406,7 +406,21 @@ class Application(Frame,object):
         self.matrixWindow.geometry("1400x500")
         self.matrixWindow.title("Matrix view")
         self.matrixWindow.configure(background='#555555')
+        
+        self.matrix_notebook = ttk.Notebook(self.matrixWindow)
+        self.matrix_notebook.grid(row=0, column=0, sticky="nsew")
 
+        # Create two frames to act as tabs
+        self.tab1 = Frame(self.matrix_notebook, background='#555555')
+        self.tab2 = Frame(self.matrix_notebook, background='#555555')
+
+        # Add the tabs to the notebook
+        self.matrix_notebook.add(self.tab1, text="Matrix View")
+        self.matrix_notebook.add(self.tab2, text="Other Tab")
+
+        # Configure grid layout in self.matrixWindow so the notebook expands
+        self.matrixWindow.grid_columnconfigure(0, weight=1)
+        self.matrixWindow.grid_rowconfigure(0, weight=1)
         
         ### some other stuff ####
         #creates window for statistics and other data
@@ -4183,12 +4197,23 @@ class Application(Frame,object):
         # Create a model from this data
         model = TableModel()
         model.importDict(data)
-        mview = SyncScrollExample(self.matrixWindow, self.images_in_selected, self.all_edges, self.hyperedges, self.hdf_path, data, model)  # Try bigger row_count
+        mview = SyncScrollExample(self.tab1, self.images_in_selected, self.all_edges, self.hyperedges, self.hdf_path, data, model)  # Try bigger row_count
         mview.grid(row=0, column=0, sticky="nsew")
-        self.matrixWindow.bind('<Button-3>', self.click_select_in_matrix)
-        # Configure grid layout in self.matrixWindow
-        self.matrixWindow.grid_columnconfigure(0, weight=1)
-        self.matrixWindow.grid_rowconfigure(0, weight=1)
+
+        self.tab1.grid_columnconfigure(0, weight=1)
+        self.tab1.grid_rowconfigure(0, weight=1)
+
+        # Bind the right-click event (if needed) to tab1 (or you can bind it to mview directly)
+        self.tab1.bind('<Button-3>', self.click_select_in_matrix)
+
+        confusion_matrix = HyperedgeConfusionMatrix(self.tab2, hyperedges=self.hyperedges)
+        confusion_matrix.grid(row=0, column=0, sticky="nsew")
+        self.tab2.grid_rowconfigure(0, weight=1)
+        self.tab2.grid_columnconfigure(0, weight=1)
+        # self.matrixWindow.bind('<Button-3>', self.click_select_in_matrix)
+        # # Configure grid layout in self.matrixWindow
+        # self.matrixWindow.grid_columnconfigure(0, weight=1)
+        # self.matrixWindow.grid_rowconfigure(0, weight=1)
 
         # Create the table
         # table = TableCanvas(
@@ -4231,7 +4256,7 @@ class Application(Frame,object):
 
     def display_matrix(self):
         # Clear previous contents from the matrixWindow
-        for widget in self.matrixWindow.winfo_children():
+        for widget in self.tab1.winfo_children():
             widget.destroy()
 
         selected_edge = self.selected_edge
