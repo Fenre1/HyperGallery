@@ -102,7 +102,7 @@ class LazyImagePanel(tk.Frame):
 
 
 class SyncScrollExample(tk.Frame):
-    def __init__(self, parent, images_in_selected, all_edges, hyperedges, hdf_path, data, model, **kwargs):
+    def __init__(self, parent, images_in_selected, hdf_path, data, model, **kwargs):
         super().__init__(parent, **kwargs)
 
 

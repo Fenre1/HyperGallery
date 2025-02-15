@@ -595,37 +595,37 @@ class Application(Frame,object):
         
 
     #this function ranks a selected image by rightclicking an image. It will sort all images based on correlation
-    def rank_images(self, event):
-        self.communication_label.configure(text='Calculating the ranking. Please wait.')
-        self.communication_label['background'] = '#99CCFF'
-        self.communication_label.update_idletasks()
-        evex = self.c.canvasx(event.x)   #x location to determine selected image
-        evey = self.c.canvasy(event.y)   #y location to determine selected image
-        self.bucketDisp = 2
-        x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1 #determine the row
-        y_num = math.ceil((evey)/(self.imsize + self.image_distance))   #determine the column
-        im_num = x_num + self.num_im_row*(y_num-1) #calculate the actual image number using row and column
-        im_tag = self.c.gettags(self.imagex[im_num])    #get the actual image id from imagex (imagex is a list of all currently displayed images)
-        im_tag = int(float(im_tag[0]))
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'query image')
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+str(int(im_tag)))        
-        with h5py.File(self.hdf_path, 'r') as hdf:
-            self.rank_list = np.array(hdf.get('cm')[int(im_tag),:])
-        if len(self.video_cm)>0:
-            self.rank_list = np.hstack((self.rank_list,self.video_cm[int(im_tag),:]))
-        temp_list = np.sort(self.rank_list,0)[::-1] #sorts the correlations
-        self.rank_list = np.argsort(self.rank_list,0)[::-1] #sorts the id of all the images based on correlation
-        self.c.xview_moveto(self.origX)  #####
-        self.c.yview_moveto(self.origY) ######
-        self.rank_list = np.asarray(self.rank_list)
-        temp_list = np.asarray(temp_list)
-        temp_list[np.isnan(temp_list)] = -100   #some images have no correlations due to issues with loading and extracting the image features. Ususally means the image file is damaged
-        self.rank_list = self.rank_list[temp_list>-50] # this removes all the broken images
-        self.rank_list = np.append(im_tag,self.rank_list) # this adds the selected (queried) image to the image list to be displayed
-        self.c.delete("all")
-        self.display_images(self.rank_list) #function to display the ranked list of images. By default it displays all images, but may need to be limited for large datasets    
-        self.communication_label['background'] = '#FFFFFF'
-        self.communication_label.configure(text='Finished calculating. Showing the ranking')
+    # def rank_images(self, event):
+    #     self.communication_label.configure(text='Calculating the ranking. Please wait.')
+    #     self.communication_label['background'] = '#99CCFF'
+    #     self.communication_label.update_idletasks()
+    #     evex = self.c.canvasx(event.x)   #x location to determine selected image
+    #     evey = self.c.canvasy(event.y)   #y location to determine selected image
+    #     self.bucketDisp = 2
+    #     x_num = math.ceil((evex)/(self.imsize + self.image_distance))-1 #determine the row
+    #     y_num = math.ceil((evey)/(self.imsize + self.image_distance))   #determine the column
+    #     im_num = x_num + self.num_im_row*(y_num-1) #calculate the actual image number using row and column
+    #     im_tag = self.c.gettags(self.imagex[im_num])    #get the actual image id from imagex (imagex is a list of all currently displayed images)
+    #     im_tag = int(float(im_tag[0]))
+    #     self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'query image')
+    #     self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+str(int(im_tag)))        
+    #     with h5py.File(self.hdf_path, 'r') as hdf:
+    #         self.rank_list = np.array(hdf.get('cm')[int(im_tag),:])
+    #     if len(self.video_cm)>0:
+    #         self.rank_list = np.hstack((self.rank_list,self.video_cm[int(im_tag),:]))
+    #     temp_list = np.sort(self.rank_list,0)[::-1] #sorts the correlations
+    #     self.rank_list = np.argsort(self.rank_list,0)[::-1] #sorts the id of all the images based on correlation
+    #     self.c.xview_moveto(self.origX)  #####
+    #     self.c.yview_moveto(self.origY) ######
+    #     self.rank_list = np.asarray(self.rank_list)
+    #     temp_list = np.asarray(temp_list)
+    #     temp_list[np.isnan(temp_list)] = -100   #some images have no correlations due to issues with loading and extracting the image features. Ususally means the image file is damaged
+    #     self.rank_list = self.rank_list[temp_list>-50] # this removes all the broken images
+    #     self.rank_list = np.append(im_tag,self.rank_list) # this adds the selected (queried) image to the image list to be displayed
+    #     self.c.delete("all")
+    #     self.display_images(self.rank_list) #function to display the ranked list of images. By default it displays all images, but may need to be limited for large datasets    
+    #     self.communication_label['background'] = '#FFFFFF'
+    #     self.communication_label.configure(text='Finished calculating. Showing the ranking')
 
 
 
@@ -1315,7 +1315,7 @@ class Application(Frame,object):
         return image_sizes
 
 
-    def redraw_hypergraph(self,update=None):
+    def redraw_hypergraph(self,update=None,ranking=None):
         # Capture the current view limits
         current_xlim = self.ax.get_xlim()
         current_ylim = self.ax.get_ylim()
@@ -1343,7 +1343,10 @@ class Application(Frame,object):
         # self.filtered_umap_features = self.umap_features[all_filtered_images]
         if update:
             pass
-
+        elif ranking:
+            sample_indices = self.focus_list[0:25]
+            self.previous_visible_points = sample_indices            
+            self.scenes = self.create_scenes_from_samples(sample_indices, self.image_mapping)
         else:
         
             # sample_indices = self.all_filtered_images[self.farthest_point_sampling(self.filtered_umap_features, n_samples=25)]
@@ -2851,29 +2854,124 @@ class Application(Frame,object):
     
             self.communication_label.configure(text='Saved!')
 
-    
+
+    def create_correlation_vector(self, focusfeatures, features):
+        """
+        Compute the Pearson correlation coefficient between a focus feature vector and each sample in the features matrix.
+
+        Parameters:
+            focusfeatures (array-like): 1D array of shape (d,)
+            features (array-like): 2D array that is either of shape (d, n) or (n, d). 
+                                If it’s (n, d) (each sample is a row), it will be transposed.
+        Returns:
+            np.ndarray: 1D array of correlation coefficients for each sample.
+        """
+        # Ensure focusfeatures is 1D and features is 2D.
+        focusfeatures = np.ravel(focusfeatures)
+        features = np.atleast_2d(features)
+        
+        # If features is (n, d) where d == len(focusfeatures), transpose it to (d, n)
+        if features.shape[0] != focusfeatures.shape[0] and features.shape[1] == focusfeatures.shape[0]:
+            features = features.T
+        elif features.shape[0] != focusfeatures.shape[0] and features.shape[1] != focusfeatures.shape[0]:
+            raise ValueError("The dimensions of 'features' do not match the length of 'focusfeatures'.")
+        
+        # Number of samples (each column is one sample)
+        n = features.shape[1]
+        
+        # Compute necessary sums
+        sum_focus = np.sum(focusfeatures)               # scalar
+        sum_features = np.sum(features, axis=0)           # shape: (n,)
+        sum_focus_sq = np.sum(focusfeatures**2)           # scalar
+        sum_features_sq = np.sum(features**2, axis=0)       # shape: (n,)
+        
+        # Dot product: yields a vector of shape (n,)
+        dot_product = np.dot(focusfeatures, features)
+        
+        # Compute numerator and denominator for Pearson correlation
+        numerator = n * dot_product - sum_focus * sum_features
+        denominator = np.sqrt((n * sum_focus_sq - sum_focus**2) *
+                            (n * sum_features_sq - sum_features**2))
+        
+        # Avoid division by zero
+        with np.errstate(divide='ignore', invalid='ignore'):
+            correlation = np.where(denominator != 0, numerator / denominator, 0)
+        
+        return correlation
+
+    def rank_images(self):
+        self.focuscm = self.create_correlation_vector(self.focusfeatures, self.features)
+        sorted_indices = np.argsort(self.focuscm)[::-1]
+
+        self.focuscm = np.nan_to_num(self.focuscm, nan=-100)
+        filtered_indices = sorted_indices[self.focuscm[sorted_indices] > -50]
+        self.focus_list = filtered_indices        
+        # images_to_display = [self.im_list[i] for i in self.focus_list]
+        self.display_images(self.focus_list)
+        if len(self.focus_list) > 1000:
+            self.focus_list = self.focus_list[0:1000]
+
+        data = {}
+        for image in self.focus_list:
+            row_dict = {}   
+            row_dict['label'] = str(image)  # display image as row label
+
+            for edge in self.all_edges:
+                row_dict[edge] = '1' if image in self.hyperedges[edge] else '0'
+            
+            data[image] = row_dict
+
+        # Create a model from this data
+        model = TableModel()
+        model.importDict(data)
+        mview = SyncScrollExample(self.tab1, self.focus_list, self.hdf_path, data, model)  # Try bigger row_count
+        mview.grid(row=0, column=0, sticky="nsew")
+
+        self.tab1.grid_columnconfigure(0, weight=1)
+        self.tab1.grid_rowconfigure(0, weight=1)
+
+        # Bind the right-click event (if needed) to tab1 (or you can bind it to mview directly)
+        self.tab1.bind('<Button-3>', self.click_select_in_matrix)
+        if len(self.previous_visible_points) > 0:
+            self.redraw_hypergraph(update=None,ranking=True)
+
+
+
+
+
+    def get_img_idx_from_event(self, event):
+            if not isinstance(event.widget, Canvas):
+                return
+
+            canvas = event.widget
+            items = canvas.find_overlapping(event.x, event.y, event.x, event.y)
+            
+            for item in reversed(items):
+                if canvas.type(item) == 'image':
+                    tags = canvas.gettags(item)
+                    if tags:
+                        self.img_idx = int(tags[0])  
+                        print("Clicked image index:", self.img_idx)
+                        self.focusfeatures = self.features[self.img_idx]
+                        self.rank_images()
+            return None
     #function to load a previous session. 
     def load_as(self):
-        self.answer2 = filedialog.askopenfilename(defaultextension=".h5")  # This will make the file path a string
+        self.answer2 = filedialog.askopenfilename(defaultextension=".h5")  
+        self.bind_all("<Shift-Button-3>", self.get_img_idx_from_event)
         with h5py.File(self.answer2, 'r') as hdf:
             # Load image list
             self.im_list = hdf['file_list'][()]
-            # If the elements are bytes, decode them to strings
             if isinstance(self.im_list[0], bytes):
                 self.im_list = [n.decode("utf-8", "ignore") for n in self.im_list]
 
-            # Load clustering results
-            # Assuming 'clustering_results' is a dataset containing numerical data
             self.df = hdf['clustering_results'][()]
 
-            # Check if 'catList' exists in the HDF5 file
             if 'catList' in hdf:
                 self.catList = list(hdf['catList'][()])
-                # Decode bytes to strings if necessary
                 if isinstance(self.catList[0], bytes):
                     self.catList = [n.decode("utf-8", "ignore") for n in self.catList]
             else:
-                # Create catList based on the number of columns in self.df
                 num_columns = self.df.shape[1]
                 self.catList = tuple(f'edge_{i}' for i in range(num_columns))
 
@@ -2892,21 +2990,18 @@ class Application(Frame,object):
             else:
                 self.initialize_hyperedges()
 
-            # Load 'num_clus' if it exists
             if 'num_clus' in hdf:
                 self.num_clus = hdf['num_clus'][()]
             else:
-                self.num_clus = 0  # Or set a default value
+                self.num_clus = 0  
 
             self.hdf_path = self.answer2
             self.features = hdf['features'][()]
 
-        # Update categories Listbox
         self.categories.delete(0, END)
         for category in self.catList:
             self.categories.insert(END, category)
 
-        # Configure scrollbar for the Listbox
         boxscrollbar = Scrollbar(width=10)
         boxscrollbar.config(command=self.categories.yview)
         boxscrollbar.place(in_=self.categories, relx=1.0, relheight=1)
@@ -4164,26 +4259,7 @@ class Application(Frame,object):
 
     def show_matrix(self):
 
-        # main_frame = Frame(self.matrixWindow)
-        # main_frame.pack(fill='both', expand=True)
-
-        # # Create a frame for the table on the right
-        # table_frame = Frame(main_frame)
-        # table_frame.pack(side='right', fill='both', expand=True)
-
-        # # Create a frame for the image panel on the left
-        # image_frame = Frame(main_frame)
-        # image_frame.pack(side='left', fill='y')
-
-        # # Create the image panel on the left
-        # self.image_panel = LazyImagePanel(
-        #     image_frame,
-        #     images_in_selected=self.images_in_selected,
-        #     row_height=100,
-        #     hdf_path=self.hdf_path
-        # )
-        # self.image_panel.pack(side="left", fill="both", expand=False)
-
+   
         data = {}
         for image in self.images_in_selected:
             row_dict = {}   
@@ -4197,7 +4273,7 @@ class Application(Frame,object):
         # Create a model from this data
         model = TableModel()
         model.importDict(data)
-        mview = SyncScrollExample(self.tab1, self.images_in_selected, self.all_edges, self.hyperedges, self.hdf_path, data, model)  # Try bigger row_count
+        mview = SyncScrollExample(self.tab1, self.images_in_selected, self.hdf_path, data, model)  # Try bigger row_count
         mview.grid(row=0, column=0, sticky="nsew")
 
         self.tab1.grid_columnconfigure(0, weight=1)
@@ -4210,49 +4286,6 @@ class Application(Frame,object):
         confusion_matrix.grid(row=0, column=0, sticky="nsew")
         self.tab2.grid_rowconfigure(0, weight=1)
         self.tab2.grid_columnconfigure(0, weight=1)
-        # self.matrixWindow.bind('<Button-3>', self.click_select_in_matrix)
-        # # Configure grid layout in self.matrixWindow
-        # self.matrixWindow.grid_columnconfigure(0, weight=1)
-        # self.matrixWindow.grid_rowconfigure(0, weight=1)
-
-        # Create the table
-        # table = TableCanvas(
-        #     parent       = table_frame,
-        #     model        = model,
-        #     showkeynames = False,   # Show row label from 'label' field
-        #     rowheaderwidth=100,
-        #     cellwidth    = 60,
-        #     thefont      = ('Arial', 12),
-        #     rowheight    = 100,
-        #     bgcolor      = '#555555',
-        #     editable     = False,            
-            
-        # )
-        # table.bgcolor = '#555555'
-        # #table.setbgcolor()
-        # # Render the table first so rows and columns are set up
-        # table.show()
-
-        # # Now color cells with value '1' in 'seagreen'
-        # for image_key, row_dict in data.items():
-        #     # Get the row index for this image
-        #     row_index = table.model.getRecordIndex(image_key)
-
-        #     for col_name, val in row_dict.items():
-        #         if col_name == 'label':
-        #             col_index = table.model.columnNames.index(col_name)
-        #             table.model.setColorAt(row_index, col_index, color='#555555',key='bg')  
-        #         if val == '1':
-        #             # Find column index
-        #             col_index = table.model.columnNames.index(col_name)
-        #             # Set background color for this cell
-        #             table.model.setColorAt(row_index, col_index, color='seagreen',key='bg')
-        #         else:
-        #             col_index = table.model.columnNames.index(col_name)
-        #             # Set background color for this cell
-        #             table.model.setColorAt(row_index, col_index, color='#555555',key='bg')
-        # # Redraw the table to show the new colors
-        # table.redraw()
 
     def display_matrix(self):
         # Clear previous contents from the matrixWindow
@@ -4267,217 +4300,11 @@ class Application(Frame,object):
         if len(images_in_selected) > 200:
             images_in_selected = set(list(images_in_selected)[:200])
         # Sort all edges and filter out the selected_edge so it is not displayed as a column
-        all_edges = [e for e in sorted(self.hyperedges.keys()) if e != selected_edge]
+        all_edges = [e for e in sorted(self.hyperedges.keys())]
         self.all_edges = all_edges
         self.images_in_selected = images_in_selected
         self.show_matrix()
-        # Create a canvas and a frame inside it to enable scrolling
-        # canvas = Canvas(self.matrixWindow, borderwidth=0, bg="#555555", highlightthickness=0)
-        # scroll_y = Scrollbar(self.matrixWindow, orient="vertical", command=canvas.yview)
-        # frame = Frame(canvas, bg="#555555")
 
-        # # Associate the frame with the canvas for scrolling
-        # frame_id = canvas.create_window((0,0), window=frame, anchor="nw")
-
-        # # Configure canvas to use scrollbar
-        # canvas.config(yscrollcommand=scroll_y.set)
-        # scroll_y.pack(side="right", fill="y")
-        # canvas.pack(side="left", fill="both", expand=True)
-
-        # # Update scroll region on size changes
-        # def update_scroll_region(event):
-        #     canvas.configure(scrollregion=canvas.bbox("all"))
-        # frame.bind("<Configure>", update_scroll_region)
-
-        # # Mouse wheel scrolling
-        # def _on_mousewheel(event):
-        #     canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-
-        # # Bind mousewheel to canvas for scrolling when mouse is over the canvas
-        # canvas.focus_set()
-        # canvas.bind("<MouseWheel>", _on_mousewheel)
-
-        # # Optional: Use enter/leave bindings if needed for more reliable scrolling
-        # # def _bound_to_mousewheel(event):
-        # #     canvas.bind_all("<MouseWheel>", _on_mousewheel)
-        # # def _unbound_to_mousewheel(event):
-        # #     canvas.unbind_all("<MouseWheel>")
-        # # frame.bind('<Enter>', _bound_to_mousewheel)
-        # # frame.bind('<Leave>', _unbound_to_mousewheel)
-
-        # # Create header row (excluding the selected edge)
-        # header_label = Label(frame, text="Image", font=("Arial", 12, "bold"), bg="#555555", fg="white")
-        # header_label.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
-
-        # for col_idx, edge in enumerate(all_edges, start=1):
-        #     header_label = Label(frame, text=edge, font=("Arial", 12, "bold"), bg="#555555", fg="white")
-        #     header_label.grid(row=0, column=col_idx, sticky="nsew", padx=2, pady=2)
-
-        # # Load and display images, membership
-        # with h5py.File(self.hdf_path, 'r') as hdf:
-        #     self.my_matrix_img = []
-        #     for row_idx, img in enumerate(images_in_selected, start=1):
-        #         # Load and resize image
-        #         load = Image.fromarray(np.array(hdf.get('thumbnail_images')[img], dtype='uint8'))
-        #         load = load.resize((100, 100), Image.Resampling.LANCZOS)
-        #         render = ImageTk.PhotoImage(load)
-        #         self.my_matrix_img.append(render)
-
-        #         # Display image cell with #555555 background
-        #         img_label = Label(frame, image=render, width=100, height=100, bg="#555555")
-        #         img_label.grid(row=row_idx, column=0, sticky="nsew", padx=2, pady=2)
-
-        #         # Membership columns (excluding selected_edge)
-        #         for col_idx, edge in enumerate(all_edges, start=1):
-        #             value = "1" if img in self.hyperedges[edge] else "0"
-                    
-        #             # Default bg is #555555, if 1 then green
-        #             cell_bg = "green" if value == "1" else "#555555"
-                    
-        #             cell = Label(frame, text=value, font=("Arial", 10), width=3, height=2, bg=cell_bg, fg="white")
-        #             cell.grid(row=row_idx, column=col_idx, sticky="nsew", padx=2, pady=2)
-
-        # total_cols = len(all_edges) + 1
-        # for c in range(total_cols):
-        #     frame.grid_columnconfigure(c, weight=1)
-
-        # total_rows = len(images_in_selected) + 1
-        # for r in range(total_rows):
-        #     frame.grid_rowconfigure(r, weight=0)
-
-        # canvas.update_idletasks()
-        # canvas.config(scrollregion=canvas.bbox("all"))
-
-
-
-    # function to sort clusters based on a bucket. Average feature vector for 
-    # each cluster correlated with average feature vector of bucket. 
-    def sorting_clusters(self):
-        if self.bucketDisp == 1:
-            self.num_clus_bu = copy.deepcopy(self.num_clus)
-            self.df_bu = copy.deepcopy(self.df)
-            
-            self.df = np.asarray(self.df)
-            catfeat = np.zeros((1,self.features.shape[1]))
-            catfeat[0] = np.mean(self.features[np.asarray(self.current_bucket),:],0) #the average of all features in the current cat bucket
-            avg_feat = []
-            for i in range(0,self.df.shape[1]):
-                cluster = self.df[:,i]
-                cluster = cluster[np.where(cluster>-1)]
-                avg_feat.append(np.mean(self.features[cluster],0))
-            avg_feat = np.asarray(avg_feat)
-            sortedcluster_ind = self.create_matrix2(catfeat,avg_feat,'')
-            sortedcluster_ind = np.flip(np.argsort(sortedcluster_ind))
-            sortedcluster_ind = pd.DataFrame(sortedcluster_ind.T)
-            self.df  = self.df[:,sortedcluster_ind[0]]
-            #self.df = pd.DataFrame.from_records(self.df)
-            self.num_clus = 0
-            self.showImg()
-            self.communication_label.configure(text='Sorted the clusters, now showing the first cluster')
-        else:
-            self.communication_label.configure(text='Show a bucket first, before sorting.')
-        
-    def restore_cluster_order(self):
-        self.num_clus = self.num_clus_bu
-        self.df = self.df_bu
-        self.showImg()
-                
-    #function to calculate the average features of a cluster. This way, the most representative image of a cluster can be found. Doing so, an overview of all clusters using the representative image can be generated.
-    def calculate_avg_vector(self):
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'calculate overview')
-        self.communication_label.configure(text='Calculating the vector. Please wait a moment.')
-        self.communication_label['background'] = '#99CCFF'
-        self.communication_label.update_idletasks()
-        df = self.df + 1
-        nonzeros = df.astype(bool).sum(axis=0)
-        df = None
-        avg_feat_vec = []
-        self.cluster_to_vector = []
-        self.represent=[]
-        for i in range(0,self.df.shape[1]):
-            avg_feat = np.zeros([nonzeros[i],np.size(self.features,1)])
-            for j in range(0,nonzeros[i]):
-                avg_feat[j,0:np.size(self.features,1)] = self.features[self.df[j][i]]
-            avg_feat_vec.append(np.mean(avg_feat,axis=0))
-            calc_corr = []
-            for k in range(0,nonzeros[i]):
-                cc = np.corrcoef(avg_feat_vec[i],avg_feat[k])
-                calc_corr.append(cc[0][1])
-            self.represent.append(self.df[np.argmax(calc_corr),i])
-            self.cluster_to_vector.append(calc_corr)
-        self.communication_label.configure(text='The vector has been calculated. You can now press Show overview to see a representative image of each cluster. You can then select a cluster and view it by pressing Show selected cluster.')
-        self.communication_label['background'] = '#99CCFF'
-
-    #function to show the overview of representative images for each cluster.    
-    def show_overview(self):
-        if len(self.represent) != self.df.shape[1]:
-            self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'calculate overview')
-            self.communication_label.configure(text='Calculating the vector. Please wait a moment.')
-            self.communication_label['background'] = '#99CCFF'
-            self.communication_label.update_idletasks()
-            df = self.df + 1
-            nonzeros = df.astype(bool).sum(axis=0)
-            df = None
-            avg_feat_vec = []
-            self.cluster_to_vector = []
-            self.represent=[]
-            for i in range(0,self.df.shape[1]):
-                avg_feat = np.zeros([nonzeros[i],np.size(self.features,1)])
-                for j in range(0,nonzeros[i]):
-                    avg_feat[j,0:np.size(self.features,1)] = self.features[self.df[j][i]]
-                avg_feat_vec.append(np.mean(avg_feat,axis=0))
-                calc_corr = []
-                for k in range(0,nonzeros[i]):
-                    cc = np.corrcoef(avg_feat_vec[i],avg_feat[k])
-                    calc_corr.append(cc[0][1])
-                self.represent.append(self.df[np.argmax(calc_corr),i])
-                self.cluster_to_vector.append(calc_corr)
-            
-            
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'showing overview')
-        try:
-            del self.ind_for_overview
-            del self.xsorted
-            del self.xsortedimtags
-        except AttributeError:
-            pass
-        self.bucketDisp = 0
-        self.c.delete("all")
-        self.im_numX = []
-        self.imagex = []
-        self.oview = 1
-        self.display_images(self.represent,input_origin='overview')
-        self.communication_label.configure(text='Now showing the overview.')
-        self.communication_label['background'] = '#99CCFF'
-
-    #Function that displays the cluster selected by the user from the overview of representative images
-    def show_selected_cluster(self):
-        im_num = self.selected_images
-        self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'show selected clusters from overview: ' + str(im_num))
-        if im_num:
-            try:            
-                im_num = self.ind_for_overview[im_num]
-            except AttributeError:
-                pass
-            self.c.delete("all")
-            #self.num_clus = im_num
-            self.c.xview_moveto(self.origX)  #####
-            self.c.yview_moveto(self.origY) ######
-            cluster = []
-            for tt in range(len(im_num)):
-                
-                cluster.append(self.df[:,im_num[tt]])
-            cluster = np.asarray(cluster)
-            cluster = cluster[cluster > -1]
-            num_im =int(self.e1.get())
-            self.imagex = []
-        if num_im > len(cluster):
-            num_im = len(cluster)
-        self.display_images(cluster)
-        self.communication_label.configure(text='Showing cluster ' + str([xa+1 for xa in im_num]) +'.') # because humans start count from 1, unlike python
-        self.communication_label['background'] = '#99CCFF'
-        self.communication_label.update_idletasks()
-        
     
     def recreate_tsne(self):
         modelu = umap.UMAP(
@@ -4602,306 +4429,6 @@ class Application(Frame,object):
             #self.sel_folder.set('found ' + str(len(self.vid_list)) + ' videos in ' + self.selected_video_folder)
 
 
-    def video_extraction(self):
-        def video_clustering(vidcm,threshold):
-            cluster_ind = []
-            clustered_images = []
-            
-            cm_len = vidcm.shape[1]
-            cm_sum = np.zeros((cm_len,1))
-            for mm in range(cm_len):
-                #warnings.filterwarnings("ignore")
-                cm_sum[mm,0] = len(np.where(vidcm[mm,:]>threshold)[0])
-
-
-            size = len(clustered_images)
-            weight2 = 1
-            m = cm_len
-            tt = 0
-            while size < cm_len:
-                if tt > 0 and threshold > 0.1:
-                    threshold = threshold-0.1
-                    cm_len = vidcm.shape[1]
-                    cm_sum = np.zeros((cm_len,1))
-                    for mm in range(cm_len):
-                        cm_sum[mm,0] = len(np.where(vidcm[mm,:]>threshold)[0])
-                
-                elif tt > 0 and threshold <= 0.1:
-                    remains = np.arange(0,m)
-                    remains[np.asarray(clustered_images)] = -100            
-                    final_column = remains[remains > 0]
-                    cluster_ind.append(final_column)
-                    # cm[final_column,:] = -100
-                    # cm[:,final_column] = -100
-                    break
-                
-                tt = 1
-                new_cluster = []
-                #while np.sum(cm_bool) > 0:
-                while np.sum(cm_sum) - len(new_cluster)  > 0:
-                    tg = 0
-                    for g in range(0,len(cluster_ind)):
-                        tg = tg + len(cluster_ind[g])
-                    #cm_sum = np.sum(cm_bool,1)
-                    cm_most = np.argmax(cm_sum)
-                    column1 = vidcm[:,cm_most]
-                    try:
-                        column1[np.asarray(clustered_images)] = -100
-                    except IndexError:
-                        pass                                            
-                    new_cluster = []
-                    column_max = np.nanargmax(column1)
-                    if column1[column_max] > threshold:
-                        column2 = vidcm[:,column_max]
-                        try:
-                            column2[np.asarray(clustered_images)] = -100
-                        except IndexError:
-                            pass
-                            
-                        
-                        weight1 = 1        
-                        new_column = float(weight1) / (weight1+weight2) * column1 + float(weight2)/(weight1+weight2)*column2
-                        ## cm_bool[:,cm_most] = 0
-                        ## cm_bool[cm_most,:] = 0
-                        ## cm_bool[column_max,:] = 0
-                        ## cm_bool[:,column_max] = 0
-                        new_cluster.append(cm_most)
-                        new_cluster.append(column_max)
-                        clustered_images.append(cm_most)
-                        clustered_images.append(column_max)
-                        new_column[new_cluster] = 0
-                        while bn.nanmax(new_column) > threshold:
-                            weight1 = weight1 + 1
-                            column1 = new_column
-                            column_max = np.nanargmax(column1)
-                            
-                            column2 = vidcm[:,column_max]
-                            try:
-                                column2[np.asarray(clustered_images)] = -100
-                            except IndexError:
-                                pass
-                            new_column = float(weight1) / (weight1+weight2) * column1 + float(weight2)/(weight1+weight2)*column2
-                            # cm_bool[column_max,:] = 0
-                            # cm_bool[:,column_max] = 0
-                            new_cluster.append(column_max)
-                            clustered_images.append(column_max)
-                            new_column[new_cluster] = 0
-                    else:
-                        break
-                    cluster_ind.append(new_cluster)
-                    cm_sum[new_cluster] = 0
-                    ## cm[new_cluster,:] = -100
-                    ## cm[:,new_cluster] = -100
-                    size = len(clustered_images)
-            xlength = []
-            for q in range(0,len(cluster_ind)):
-                xlength.append(len(cluster_ind[q]))
-            cluster_indX = np.zeros((max(xlength),len(cluster_ind)))-1        
-            for r in range(0,len(cluster_ind)):
-                for s in range(0,len(cluster_ind[r])):
-                    cluster_indX[s,r] = int(cluster_ind[r][s])
-            cluster_indX = cluster_indX.astype(int)
-            return cluster_indX
-        
-        def create_matrix2(focusfeatures,features,distance_metric):
-            focusfeatures = np.squeeze(np.expand_dims(focusfeatures,0))
-            features = np.squeeze(np.expand_dims(features,0))
-            features_t = np.transpose(features)
-            focusfeatures_t = np.transpose(focusfeatures)
-            cm = []                
-            sumX = sum(features_t)
-            focussumX = sum(focusfeatures_t)
-            sumsquareX = sum(features_t**2)            
-            feat0 = focusfeatures
-            sumXY = np.dot(feat0,features_t)
-            r = features.shape[1]*sumXY - focussumX*sumX 
-            s = ((features.shape[1] * sumsquareX) - sumX**2)
-            t = 1./((s[0]*s)**0.5)
-            u = r * t
-            cm.append(u)
-            cm = np.asarray(cm)
-            return cm
-        
-        ### calculate avg or median of existing clustering. 
-        if len(self.df)>0:
-            npdf = np.asarray(self.df)
-            avg_df = []
-            median_df = []
-            for clstr in range(npdf.shape[1]):
-                # misschien overview hergebruiken...?
-                clstr_feat = self.features[npdf[:,clstr][npdf[:,clstr]>-1]]
-                avg_clstr_feat = np.mean(clstr_feat,0)
-                median_clstr_feat = clstr_feat[np.argmax(create_matrix2(avg_clstr_feat,clstr_feat,'correlation'))]
-                avg_df.append(avg_clstr_feat)
-                median_df.append(median_clstr_feat)
-            avg_df = np.asarray(median_df)
-            median_df = np.asarray(median_df)
-        
-        ###create folder for extraction of frames, remove existing folder. 
-        self.video_features_list = []
-        self.video_features_original_video = [] #keeps list of which cluster belongs to what video.
-        self.snapshot_list = []
-        video_frame_path = os.getcwd()+'\\frames'
-        snapshot_path = os.getcwd()+'\\snapshots'
-        try:
-                os.mkdir(snapshot_path)
-        except FileExistsError:
-            pass
-        except PermissionError:
-            print('not allowed to create folder (permission error)')
-        snapshot_counter = 0
-        for vidya in self.vid_list:           
-            try:
-                os.mkdir(video_frame_path)
-            except FileExistsError:
-                shutil.rmtree(video_frame_path)
-                os.mkdir(video_frame_path)
-            except PermissionError:
-                print('not allowed to create folder (permission error)')
-                        
-            #### extract frames
-            cap = cv2.VideoCapture(vidya)
-            vidlength = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            if vidlength > 20000:
-                print(vidya + ' video too long and is skipped') ## misschien later video gewoon splitsen in batches van 10000
-            else:
-                success,image = cap.read()
-                count = 0
-                while success:
-                    cv2.imwrite(video_frame_path + "\\frame%d.png" % count, image)     # save frame as JPEG file      
-                    success,image = cap.read()
-                    #print('Read a new frame: ', success)
-                    count += 1            
-                vid_frames = glob.glob(video_frame_path + '/**/*.png', recursive=True)
-                vid_features = self.feature_extraction(self.neuralnet,vid_frames)
-                cm_vid = self.create_matrix(vid_features,'correlation')
-                vid_cluster = video_clustering(cm_vid,0.5)
-                for clstr in range(vid_cluster.shape[1]):
-                    clstr_feat = vid_features[vid_cluster[:,clstr][vid_cluster[:,clstr]>-1]]
-                    avg_clstr_feat = np.mean(clstr_feat,0)
-                    median_img = np.argmax(create_matrix2(avg_clstr_feat,clstr_feat,'correlation'))
-                    median_clstr_feat = clstr_feat[median_img]
-                    video_snapshot = vid_frames[median_img]
-                    snpsht = snapshot_path + '\\' + str(snapshot_counter) + '.png'
-                    shutil.copy(video_snapshot,snpsht)
-                    ## misschien video maken van frames.
-                    self.video_features_original_video.append(vidya)
-                    self.video_features_list.append(median_clstr_feat)
-                    self.snapshot_list.append(snpsht)
-                    snapshot_counter += 1
-        self.video_features_list = np.squeeze(np.asarray(self.video_features_list))
-        #mogelijk moet het volgende nog efficienter gemaakt worden, maar ik denk dat dat wel meevalt. Afhankelijk van hoeveelheid clusters in df.
-        combo_features = np.vstack((self.video_features_list,np.squeeze(median_df)))
-        len_vidf = len(self.video_features_list)
-        if len_vidf == 2048 and len(self.video_features_list.shape) == 1:
-            len_vidf = 1
-        
-        vid_df_cm = np.corrcoef(combo_features)[0:len_vidf,len_vidf::]        
-        self.c_id = np.nanargmax(vid_df_cm,1)
-        self.c_val = np.argmax(vid_df_cm,1)
-        placeholder_array = np.zeros((np.bincount(self.c_id).max(),self.df.shape[1]))-1
-        for vc in range(len(self.c_id)):
-            empty_spot = np.where(placeholder_array[:,self.c_id[vc]]==-1)[0][0]
-            placeholder_array[empty_spot,self.c_id[vc]] = int(vc+len(self.features))
-        placeholder_array = np.array(placeholder_array,dtype='int')
-        self.features = np.vstack((self.features,self.video_features_list))
-        self.im_list = self.im_list + self.snapshot_list
-        #placeholder_array = pd.DataFrame.from_records(placeholder_array)
-        self.df = np.asarray(self.df,dtype='int')
-        self.df = np.vstack((self.df,placeholder_array))
-        #self.df = pd.DataFrame.from_records(self.df)
-        self.video_cm = np.zeros((len(self.video_features_list),len(self.features)))
-        for vdo in range(len(self.video_features_list)):
-            self.video_cm[vdo] = create_matrix2(self.video_features_list[vdo],self.features,'correlation')
-        
-        
-                    
-    ## SOMETHING IS STILL WRONG WITH WHERE EACH IMAGE IS PLACED.
-    
-    
-    def determinator(self):
-        if self.bucketDisp == 1:
-            with h5py.File(self.hdf_path, 'r') as hdf:
-                self.cur_buck = self.current_bucket
-                self.cur_buck = np.sort(self.cur_buck)
-                bucket_cm = np.array(hdf.get('cm')[self.cur_buck,:])
-                bucket_within = bucket_cm[:,self.cur_buck]
-                #np.savetxt("D:\\Stuff\\test\\bucket_within.csv", bucket_within, delimiter="@")
-                self.inbetweeners = []
-                self.inbetweeners_list = []
-                for zz in range(len(self.cur_buck)):
-                    #im1 = self.current_bucket[zz]
-                    self.inbetweeners.append([])
-                    for yy in range(len(self.cur_buck)):
-                        if yy != zz:
-                            try:
-                                #im2 = self.current_bucket[yy]
-                                curr_corr = bucket_within[zz,yy]
-                                corr_all = np.vstack([bucket_cm[zz],bucket_cm[yy]])
-                                corr_all2 = copy.deepcopy(corr_all)
-                                corr_all2[corr_all2>curr_corr] = 1
-                                corr_all2[corr_all2<=curr_corr] = 0
-                                image_of_interest = np.sum(corr_all2,0)
-                                image_of_interest[image_of_interest<2] = 0
-                                image_of_interest[image_of_interest==2] = 1
-                                ioi = np.sum(corr_all,0)
-                                ioi[image_of_interest==0] = np.nan
-                                self.inbetweeners[zz].append(np.nanargmin(ioi))
-                                self.inbetweeners_list.append(np.nanargmin(ioi))
-                                
-                            except ValueError:
-                                self.inbetweeners[zz].append(-1)
-                #np.savetxt("D:\\Stuff\\test\\inbetweeners.csv", self.inbetweeners, delimiter="@")
-                self.inbetweeners_list = np.unique(np.asarray(self.inbetweeners_list))
-                self.c.delete("all")
-                self.im_numX = []
-                self.imagex = []
-                self.display_images(self.inbetweeners_list)
-        else:
-            pass
-    
-    def use_determinator(self):
-        positive_images = self.ccluster[self.selected_images]
-        connected_images = []
-        for zi in range(len(self.inbetweeners)):        
-            connected_images.append([])
-            for yi in range(len(positive_images)):            
-                try:
-                    connected_images[zi].append(int(np.where(positive_images[yi]==self.inbetweeners[zi])[0]))
-                except TypeError:
-                    pass
-        
-        
-        the_groups = [[]]
-        for uh in range(len(connected_images)):
-            added = 0
-            for ih in range(len(the_groups)):
-                if set(the_groups[ih]).intersection(connected_images[uh]):
-                    the_groups[ih] = the_groups[ih] + connected_images[uh]
-                    added = 1
-                else:
-                    pass
-            if added == 0:
-                the_groups.append(connected_images[uh])
-        added = 1
-        while added == 1:
-            added = 0
-            for ih in range(len(the_groups)):
-                for uh in range(len(the_groups)):
-                    if ih != uh:
-                        if set(the_groups[ih]).intersection(the_groups[uh]):
-                            the_groups[ih] = the_groups[ih] + the_groups[uh]                            
-                            the_groups[uh] = []
-                            added = 1
-        final_groups = []
-        for grp in the_groups:
-            if len(grp) > 0:
-                grp = self.cur_buck[np.unique(np.asarray(grp))]
-                final_groups.append(grp)
-        self.final_groups_display = np.asarray(0)
-        for gr in final_groups:
-            self.final_groups_display = np.hstack((self.final_groups_display, gr, 0))
-        self.display_images(self.final_groups_display)
         ## WHY DO I MISS CERTAIN IMAGES?? ALSO MAYBE 1 IMAGE IS ENOUGH TO MAKE IT A NEW CLUSTER.
     
     # redo and undo DISPLAY IMAGES ONLY, not actions such as adding to bucket.
@@ -4927,166 +4454,172 @@ class Application(Frame,object):
 
 
 
-#### meta data scripts ####
 
-    def read_metadata(self):
-        def get_exif_data(image_path):
-            """
-            Extracts the EXIF data from an image.
-            """
-            with open(image_path, 'rb') as f:
-                tags = exifread.process_file(f)
+
+
+
+    
+
+
+
+# #### meta data scripts ####
+
+#     def read_metadata(self):
+#         def get_exif_data(image_path):
+#             """
+#             Extracts the EXIF data from an image.
+#             """
+#             with open(image_path, 'rb') as f:
+#                 tags = exifread.process_file(f)
                 
-            exif_data = {}
-            for tag, value in tags.items():
-                tag_name = tag.split(' ')[-1]
-                exif_data[tag_name] = value
+#             exif_data = {}
+#             for tag, value in tags.items():
+#                 tag_name = tag.split(' ')[-1]
+#                 exif_data[tag_name] = value
 
-            return exif_data
+#             return exif_data
         
-        image_data = []
-        all_columns = set()
+#         image_data = []
+#         all_columns = set()
 
-        for imind, file in enumerate(self.im_list):
+#         for imind, file in enumerate(self.im_list):
             
-            exif_data = get_exif_data(file)
+#             exif_data = get_exif_data(file)
             
-            # Ensure 'Image Path' column is included
-            exif_data['Image Path'] = file
-            exif_data['Index'] = imind  # Add index column
+#             # Ensure 'Image Path' column is included
+#             exif_data['Image Path'] = file
+#             exif_data['Index'] = imind  # Add index column
             
-            image_data.append(exif_data)
-            all_columns.update(exif_data.keys())
+#             image_data.append(exif_data)
+#             all_columns.update(exif_data.keys())
     
-        # Convert the set of all columns to a list
-        all_columns = sorted(list(all_columns))
+#         # Convert the set of all columns to a list
+#         all_columns = sorted(list(all_columns))
         
-        # Create DataFrame with all possible columns
-        self.meta_data = pd.DataFrame(image_data, columns=all_columns)        
-        self.metadata_listbox.delete(0, END)
-        for col in all_columns:
-            self.metadata_listbox.insert(END, col)
-        self.metaList = self.metadata_listbox.get(0,END)
+#         # Create DataFrame with all possible columns
+#         self.meta_data = pd.DataFrame(image_data, columns=all_columns)        
+#         self.metadata_listbox.delete(0, END)
+#         for col in all_columns:
+#             self.metadata_listbox.insert(END, col)
+#         self.metaList = self.metadata_listbox.get(0,END)
 
-    def display_selected_metadata(self):
-        selected_columns = list(self.metadata_selection_listbox.get(0, END))
-        if selected_columns:
-            self.display_metadata(selected_columns)
-        else:
-            self.communication_label.configure(text='No metadata items selected.')
+#     def display_selected_metadata(self):
+#         selected_columns = list(self.metadata_selection_listbox.get(0, END))
+#         if selected_columns:
+#             self.display_metadata(selected_columns)
+#         else:
+#             self.communication_label.configure(text='No metadata items selected.')
             
             
-    def display_metadata(self, columns):
-        meta_window = Toplevel(root)
-        meta_window.title("Metadata")
+#     def display_metadata(self, columns):
+#         meta_window = Toplevel(root)
+#         meta_window.title("Metadata")
         
-        if 'Index' not in columns:
-            columns = ['Index'] + columns
+#         if 'Index' not in columns:
+#             columns = ['Index'] + columns
         
-        # Create a frame for the Treeview and scrollbar
-        frame = ttk.Frame(meta_window)
-        frame.pack(expand=True, fill='both')
+#         # Create a frame for the Treeview and scrollbar
+#         frame = ttk.Frame(meta_window)
+#         frame.pack(expand=True, fill='both')
     
-        # Add a vertical scrollbar
-        vsb = ttk.Scrollbar(frame, orient="vertical")
-        vsb.pack(side='right', fill='y')
+#         # Add a vertical scrollbar
+#         vsb = ttk.Scrollbar(frame, orient="vertical")
+#         vsb.pack(side='right', fill='y')
     
-        # Add a horizontal scrollbar
-        hsb = ttk.Scrollbar(frame, orient="horizontal")
-        hsb.pack(side='bottom', fill='x')
+#         # Add a horizontal scrollbar
+#         hsb = ttk.Scrollbar(frame, orient="horizontal")
+#         hsb.pack(side='bottom', fill='x')
     
-        tree = ttk.Treeview(frame, columns=columns, show='headings', yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+#         tree = ttk.Treeview(frame, columns=columns, show='headings', yscrollcommand=vsb.set, xscrollcommand=hsb.set)
         
-        for col in columns:
-            tree.heading(col, text=col, command=lambda _col=col: self.sort_column(tree, _col, False))
-            tree.column(col, width=100)
+#         for col in columns:
+#             tree.heading(col, text=col, command=lambda _col=col: self.sort_column(tree, _col, False))
+#             tree.column(col, width=100)
         
-        for index, row in self.meta_data[columns].iterrows():
-            tree.insert("", "end", values=row.tolist())
+#         for index, row in self.meta_data[columns].iterrows():
+#             tree.insert("", "end", values=row.tolist())
     
-        tree.pack(expand=True, fill='both')
+#         tree.pack(expand=True, fill='both')
         
-        # Configure the scrollbars
-        vsb.config(command=tree.yview)
-        hsb.config(command=tree.xview)
+#         # Configure the scrollbars
+#         vsb.config(command=tree.yview)
+#         hsb.config(command=tree.xview)
         
-        self.tree = tree
+#         self.tree = tree
 
 
-    def sort_column(self, tree, col, reverse):
-        data = [(tree.set(child, col), child) for child in tree.get_children('')]
-        data.sort(reverse=reverse)
+#     def sort_column(self, tree, col, reverse):
+#         data = [(tree.set(child, col), child) for child in tree.get_children('')]
+#         data.sort(reverse=reverse)
     
-        for index, (val, child) in enumerate(data):
-            tree.move(child, '', index)
+#         for index, (val, child) in enumerate(data):
+#             tree.move(child, '', index)
     
-        tree.heading(col, command=lambda: self.sort_column(tree, col, not reverse))
+#         tree.heading(col, command=lambda: self.sort_column(tree, col, not reverse))
         
-        self.sorted_indices = [tree.item(child)['values'][0] for child in tree.get_children('')]
+#         self.sorted_indices = [tree.item(child)['values'][0] for child in tree.get_children('')]
     
-    def get_sorted_indices(self):
-        try:
-            return self.sorted_indices
-        except AttributeError:
-            return list(range(len(self.im_list)))
-    
-    
-    def get_selected_and_subsequent_indices(self):
-        selected_items = self.tree.selection()
-        if not selected_items:
-            return []
-    
-        # Get the index of the first selected item
-        first_selected_item = selected_items[0]
-        first_selected_index = self.tree.index(first_selected_item)
-    
-        # Get all items in the tree
-        all_items = self.tree.get_children()
-    
-        # Retrieve indices of the selected item and all subsequent items
-        subsequent_indices = [self.tree.item(item)['values'][0] for item in all_items[first_selected_index:]]
-    
-        return subsequent_indices
+#     def get_sorted_indices(self):
+#         try:
+#             return self.sorted_indices
+#         except AttributeError:
+#             return list(range(len(self.im_list)))
     
     
-    def get_metadata(self):
-        self.communication_label.configure(text='Collecting meta data. This may take a moment.')
-        self.communication_label.update()
-        self.read_metadata()
-        # self.display_metadata()
+#     def get_selected_and_subsequent_indices(self):
+#         selected_items = self.tree.selection()
+#         if not selected_items:
+#             return []
+    
+#         # Get the index of the first selected item
+#         first_selected_item = selected_items[0]
+#         first_selected_index = self.tree.index(first_selected_item)
+    
+#         # Get all items in the tree
+#         all_items = self.tree.get_children()
+    
+#         # Retrieve indices of the selected item and all subsequent items
+#         subsequent_indices = [self.tree.item(item)['values'][0] for item in all_items[first_selected_index:]]
+    
+#         return subsequent_indices
+    
+    
+#     def get_metadata(self):
+#         self.communication_label.configure(text='Collecting meta data. This may take a moment.')
+#         self.communication_label.update()
+#         self.read_metadata()
+#         # self.display_metadata()
 
-    def get_selected_column(self):
-        pass  
+#     def get_selected_column(self):
+#         pass  
 
-    def show_images_by_metadata(self):
-        selected_and_subsequent_indices = np.array(self.get_selected_and_subsequent_indices())
-        self.display_images(selected_and_subsequent_indices)
+#     def show_images_by_metadata(self):
+#         selected_and_subsequent_indices = np.array(self.get_selected_and_subsequent_indices())
+#         self.display_images(selected_and_subsequent_indices)
     
-    def update_the_metalist(self,*args):
-        search_term = self.metasearch_var.get()
+#     def update_the_metalist(self,*args):
+#         search_term = self.metasearch_var.get()
 
-        self.metadata_listbox.delete(0, END)
+#         self.metadata_listbox.delete(0, END)
         
-        for item in self.metaList:
-            if search_term.lower() in item.lower():
-                self.metadata_listbox.insert(END, item)
+#         for item in self.metaList:
+#             if search_term.lower() in item.lower():
+#                 self.metadata_listbox.insert(END, item)
     
-    def add_selected_metadata(self):
-        selected_indices = self.metadata_listbox.curselection()
-        for i in selected_indices:
-            item = self.metadata_listbox.get(i)
-            if item not in self.metadata_selection_listbox.get(0, END):
-                self.metadata_selection_listbox.insert(END, item)
+#     def add_selected_metadata(self):
+#         selected_indices = self.metadata_listbox.curselection()
+#         for i in selected_indices:
+#             item = self.metadata_listbox.get(i)
+#             if item not in self.metadata_selection_listbox.get(0, END):
+#                 self.metadata_selection_listbox.insert(END, item)
                 
-                
 
-    def client_exit(self):
-        exit()
+#     def client_exit(self):
+#         exit()
 
     
 root = Tk()
 root.geometry("1900x700")
 root.configure(background='#555555')
 app = Application(root)
-
 root.mainloop()  
