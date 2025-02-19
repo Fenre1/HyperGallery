@@ -388,11 +388,18 @@ class Application(Frame,object):
         self.b4.place(x=400,y=120)
 
         #button to show currently selected bucket
-        self.b5 = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
-        self.b5['text'] ="Remove image from hyperedge"
+        self.b5 = Button(background='#443344', foreground='white', width=20, relief='solid', bd=1,
+                wraplength=150)
+        self.b5['text'] = "Remove image from hyperedge"
         self.b5.bind('<Button-3>',showbucket_text)        
         self.b5['command'] = self.remove_selected_image_from_hyperedge
         self.b5.place(x=400,y=150)
+
+        self.addimgbutton = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.addimgbutton['text'] ="Add image to hyperedge"
+        self.addimgbutton.bind('<Button-3>',showbucket_text)        
+        self.addimgbutton['command'] = self.add_selected_image_to_hyperedge
+        self.addimgbutton.place(x=400,y=195)
 
         #button to show currently selected bucket
         self.button_overview = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
@@ -415,8 +422,8 @@ class Application(Frame,object):
         self.tab2 = Frame(self.matrix_notebook, background='#555555')
 
         # Add the tabs to the notebook
-        self.matrix_notebook.add(self.tab1, text="Matrix View")
-        self.matrix_notebook.add(self.tab2, text="Other Tab")
+        self.matrix_notebook.add(self.tab1, text="Edge View")
+        self.matrix_notebook.add(self.tab2, text="Hypergraph View")
 
         # Configure grid layout in self.matrixWindow so the notebook expands
         self.matrixWindow.grid_columnconfigure(0, weight=1)
@@ -472,6 +479,13 @@ class Application(Frame,object):
         self.changebutton.bind('<Button-3>',changename_text)
         self.changebutton.place(x=400, y=20)
         
+        self.add_he_button = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.add_he_button['text'] = "Add hyperedge"
+        self.add_he_button['command'] = self.add_hyperedge
+        self.add_he_button.bind('<Button-3>',changename_text)
+        self.add_he_button.place(x=400, y=80)
+
+
         self.chosen_edges = Listbox(
         self.master,  # or whichever parent
         width=30,
@@ -2613,6 +2627,7 @@ class Application(Frame,object):
 #            pickle.dump(self.theBuckets,handle,protocol=pickle.HIGHEST_PROTOCOL)        
         self.c.delete("all")
         self.selected_edge = self.categories.get(self.categories.curselection()) #acquire the selected category
+        self.current_edge = self.selected_edge
         if len(self.selected_edge) == 1:
             # self.log.append(time.strftime("%H:%M:%S", time.gmtime())+ ' '+'show bucket ' + self.categories.get(selected))
             # self.BucketSel = selected
@@ -4236,7 +4251,8 @@ class Application(Frame,object):
         if self.selected_edge == None: 
             return
         for i_idx in self.selected_images:
-            self.remove_image_from_hyperedge(self.selected_edge, i_idx)
+            im_idx = int(i_idx)
+            self.remove_image_from_hyperedge(self.selected_edge, im_idx)
 
 
     def remove_image_from_hyperedge(self, hyperedge_name, i_idx):
@@ -4255,6 +4271,66 @@ class Application(Frame,object):
             # If the image mapping for i_idx is now empty, remove the entry
             if len(self.image_mapping[i_idx]) == 0:
                 del self.image_mapping[i_idx]
+        
+        self.selected_edge = self.current_edge
+        self.display_hyperedges()
+
+
+
+    def add_selected_image_to_hyperedge(self):
+        """
+        Adds the selected images to the currently selected hyperedge.
+        """
+        self.hyperedges[self.selected_edge]
+        self.selected_edge = self.categories.get(self.categories.curselection()) 
+        if self.selected_images is None:
+            return
+        if self.selected_edge is None:
+            return
+        for i_idx in self.selected_images:
+            im_idx = int(i_idx)
+            self.add_image_to_hyperedge(self.selected_edge, im_idx)
+
+
+    def add_image_to_hyperedge(self, hyperedge_name, i_idx):
+        """
+        Adds the given image index (i_idx) to the hyperedge (hyperedge_name)
+        and updates the image mapping accordingly.
+        """
+
+        # Add the image index to the hyperedge's set.
+        self.hyperedges[hyperedge_name].add(i_idx)
+
+        # Update the image mapping for this image index.
+        if i_idx not in self.image_mapping:
+            self.image_mapping[i_idx] = set()
+        self.image_mapping[i_idx].add(hyperedge_name)
+
+
+    def add_hyperedge(self):
+        """
+        Adds a new hyperedge to the hypergraph using the text in self.e2.
+        Updates the Listbox (self.categories) and the self.hyperedges dictionary.
+        """
+        # 1. Get the new hyperedge name from the Entry widget.
+        new_name = self.e2.get().strip()
+        if not new_name:
+            # If the entry is empty or only spaces, do nothing.
+            return
+
+        # 2. Check if the hyperedge already exists in the Listbox.
+        existing_names = self.categories.get(0, "end")
+        if new_name in existing_names:
+            # If a hyperedge with this name already exists, do nothing.
+            return
+
+        # 3. Insert the new hyperedge into the Listbox (at the end).
+        self.categories.insert("end", new_name)
+
+        # 4. Create a new entry in the hyperedges dictionary.
+        #    New hyperedges start with an empty set of image indices.
+        self.hyperedges[new_name] = set()
+
 
 
     def show_matrix(self):
