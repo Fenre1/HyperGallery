@@ -76,7 +76,7 @@ from matplotlib import colormaps
 import matplotlib.colors as mcolors
 from sklearn.neighbors import NearestNeighbors
 from threading import Timer
-
+from sklearn.metrics.pairwise import cosine_similarity
 # from VirtualMatrix import VirtualMatrix, create_frozen_header
 from matrix_view import LazyImagePanel, SyncScrollExample, HyperedgeConfusionMatrix
 from tkintertable import TableCanvas, TableModel
@@ -563,7 +563,8 @@ class Application(Frame,object):
         xscrollbar = Scrollbar(orient="horizontal", command=self.c.xview)        
         self.c.my_tag = 'c'
 
-        self.c.place(x = 0, y=300)
+        # self.c.place(x = 0, y=300)
+        self.c.place(relx=0, y=300, relwidth=1, relheight=1, anchor="nw")
         #yscrollbar.config(command=self.c.yview)
         #xscrollbar.config(command=self.c.xview)
         
@@ -3806,7 +3807,6 @@ class Application(Frame,object):
         """Based on the currently selected hyperedge, determine which other hyperedges need to be shown."""
         if self.selected_edge is None:
             self.selected_edge = next(iter(self.hyperedges))
-        
         # Get the images in the selected hyperedge
         self.edge_images = self.hyperedges[self.selected_edge]
         
@@ -3850,10 +3850,12 @@ class Application(Frame,object):
         self.overlapping_hyperedges = [self.overlapping_hyperedges[i] for i in sorted_indices]
         self.edge_ids = [edge_ids[i] for i in sorted_indices]
 
-        # Store the edge images as a NumPy array
         self.edge_images = np.array(list(self.edge_images), dtype=int)
-        
-        # Optionally, store the edge images as a NumPy array if needed
+        hyperedge_features = self.features[np.array(self.edge_images)]
+        avg_vector = np.mean(hyperedge_features, axis=0)
+        cosine_similarities = cosine_similarity(hyperedge_features, avg_vector.reshape(1, -1)).flatten()
+        sorted_indices = np.argsort(-cosine_similarities)
+        self.edge_images = self.edge_images[sorted_indices]
 
 
     def get_hyperedge_color_mappings(self):
@@ -4253,7 +4255,7 @@ class Application(Frame,object):
         for i_idx in self.selected_images:
             im_idx = int(i_idx)
             self.remove_image_from_hyperedge(self.selected_edge, im_idx)
-
+        self.display_hyperedges()
 
     def remove_image_from_hyperedge(self, hyperedge_name, i_idx):
         # Remove the image index from the hyperedge set
@@ -4264,7 +4266,6 @@ class Application(Frame,object):
             if len(self.hyperedges[hyperedge_name]) == 0:
                 del self.hyperedges[hyperedge_name]
 
-        # Remove the hyperedge from the image mapping
         if i_idx in self.image_mapping:
             self.image_mapping[i_idx].discard(hyperedge_name)
 
@@ -4273,7 +4274,7 @@ class Application(Frame,object):
                 del self.image_mapping[i_idx]
         
         self.selected_edge = self.current_edge
-        self.display_hyperedges()
+        
 
 
 
@@ -4368,20 +4369,22 @@ class Application(Frame,object):
         for widget in self.tab1.winfo_children():
             widget.destroy()
 
-        selected_edge = self.selected_edge
-        if selected_edge not in self.hyperedges:
-            return
+        # selected_edge = self.selected_edge
+        # if selected_edge not in self.hyperedges:
+        #     return
         
-        images_in_selected = self.hyperedges[selected_edge]
-        if len(images_in_selected) > 200:
-            images_in_selected = set(list(images_in_selected)[:200])
+        # images_in_selected = self.hyperedges[selected_edge]
+        # if len(images_in_selected) > 200:
+        #     images_in_selected = set(list(images_in_selected)[:200])
         # Sort all edges and filter out the selected_edge so it is not displayed as a column
         all_edges = [e for e in sorted(self.hyperedges.keys())]
         self.all_edges = all_edges
-        self.images_in_selected = images_in_selected
+        self.images_in_selected = self.edge_images # images_in_selected
+        if len(self.images_in_selected) > 500:
+            self.images_in_selected = self.images_in_selected[0:500]
         self.show_matrix()
 
-    
+     
     def recreate_tsne(self):
         modelu = umap.UMAP(
         n_neighbors=200,
