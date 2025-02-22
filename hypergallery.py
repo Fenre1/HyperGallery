@@ -124,7 +124,7 @@ class Application(Frame,object):
         self.rectangles = []        #contains the squares to display currently selected images
         self.greentangles = []      #contains the squares to display current images that are already in a bucket
         self.selected_images = []   #list of selected images
-        self.grid()
+        #self.grid()
         self.master.title("IMEX")   #title of the app
 #        self.image_distance = 10    #distance in pixels between images displayed
         self.focusclick = 0         #keeps track of creating the square on a focused image
@@ -204,14 +204,30 @@ class Application(Frame,object):
         ######## ALL tab1 WIDGETS ###############
         #########################################        
         self.image_distance = 10
+        self.top_imex_frame = Frame(root,bg="#666666")
+        self.top_imex_frame.pack(side="top", fill="x")
 
+        self.topleft_imex_frame = Frame(self.top_imex_frame,bg="#666666")
+        self.topleft_imex_frame.pack(side="left")
+        
+        self.topmiddleleft_imex_frame = Frame(self.top_imex_frame,bg="#666666")
+        self.topmiddleleft_imex_frame.pack(side="left")
+
+        self.topmiddleright_imex_frame = Frame(self.top_imex_frame,bg="#666666")
+        self.topmiddleright_imex_frame.pack(side="left")
+
+        self.topright_imex_frame = Frame(self.top_imex_frame,bg="#666666")
+        self.topright_imex_frame.pack(side="left")
+
+        self.bottom_imex_frame = Frame(root,bg="#666666")
+        self.bottom_imex_frame.pack(side="top", fill="both", expand=True)
         # text displaying some useful tips and a welcome message
-        self.communication_label = Message(font=12)
-        self.communication_label['background'] = '#FFFFFF'
-        self.communication_label['font'] = 12
-        self.communication_label.place(x=1150,y=20)
-        self.communication_label['width'] = 300
-        self.communication_label.configure(text='Hello and welcome to IMEX. Start on the left by selecting a folder with images or by loading a previous session. By right clicking a button, you can see some additional information about what the button does.')
+        # self.communication_label = Message(self.top_imex_frame,font=12)
+        # self.communication_label['background'] = '#FFFFFF'
+        # self.communication_label['font'] = 12
+        # self.communication_label.place(x=1150,y=20)
+        # self.communication_label['width'] = 300
+        # self.communication_label.configure(text='Hello and welcome to IMEX. Start on the left by selecting a folder with images or by loading a previous session. By right clicking a button, you can see some additional information about what the button does.')
         
         #button explanation text. The user can right-click a button to get this explanation
         def open_folder_text(event):
@@ -344,69 +360,177 @@ class Application(Frame,object):
             self.communication_label.configure(text='')
             self.communication_label.configure(text='Sort the metadata in the table (e.g., by DateTimeOriginal). Select a row in the table to display images from that point onward.')
         
+
+        ###################################
+        ###      topleft_imex_frame     ###
+        ###################################
+
         #button to load
-        self.lb = Button(background='#445544',foreground='white',width='20',relief='solid',bd=1)
+        self.lb = Button(self.topleft_imex_frame,background='#445544',foreground='white',width='20',relief='solid',bd=1)
         self.lb['text'] ="Load session"
         self.lb['command'] = lambda:[self.load_as(),self.display_hyperedges()]
         self.lb.bind('<Button-3>',load_text)
-        self.lb.place(x=200,y=20)
+        self.lb.pack()
 
-        self.e2 = Entry(background='#777777',foreground = 'white',exportselection=0,width=23)
+        #button to change name of a bucket
+        self.changebutton = Button(self.topleft_imex_frame,background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.changebutton['text'] = "Rename hyperedge"
+        self.changebutton['command'] = self.rename_hyperedge
+        self.changebutton.bind('<Button-3>',changename_text)
+        self.changebutton.pack()
+
+        self.e2 = Entry(self.topleft_imex_frame,background='#777777',foreground = 'white',exportselection=0,width=23)
         self.e2.insert(END, 'new name')
-        self.e2.place(x=400,y=50)
+        self.e2.pack()
 
-               
-        #button to show or hide images in the Non-relevant bucket
-        vv = IntVar()
-        self.nonR = ttk.Checkbutton(variable = vv)
-        self.nonR['text'] ="Check to hide Non-relevant images from displayed results"
-        self.nonR.bind('<Button-3>',nonrelevant_text)        
-        self.nonR.var = vv
-        self.nonR.place(x=400,y=220)
-        
-        #button to show or hide images already in a bucket
-        ww = IntVar()
-        self.inbucket = ttk.Checkbutton(variable = ww)
-        self.inbucket['text'] ="Check to hide images already in a bucket"
-        self.inbucket.bind('<Button-3>',inbucket_text)        
-        self.inbucket.var = ww
-        self.inbucket.place(x=400,y=240)
-
-        #enter number of images shown
-        self.e1 = Entry(background='#777777',foreground = 'white',exportselection=0,width=24)
-        self.e1.insert(END, 800) #800 is default, change if needed. 
-        self.e1.bind('<Button-3>',numim_text)        
-        self.e1.place(x=200,y=250)
-        self.var = IntVar()
-        self.var.set(0)
+        self.add_he_button = Button(self.topleft_imex_frame,background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.add_he_button['text'] = "Add hyperedge"
+        self.add_he_button['command'] = self.add_hyperedge
+        self.add_he_button.bind('<Button-3>',changename_text)
+        self.add_he_button.pack()
 
         #button to show currently selected bucket
-        self.b4 = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.b4 = Button(self.topleft_imex_frame,background='#443344',foreground='white',width='20',relief='solid',bd=1)
         self.b4['text'] ="Show hyperedge"
         self.b4.bind('<Button-3>',showbucket_text)        
         self.b4['command'] = self.showEdge
-        self.b4.place(x=400,y=120)
-
-        #button to show currently selected bucket
-        self.b5 = Button(background='#443344', foreground='white', width=20, relief='solid', bd=1,
+        self.b4.pack()
+        
+        self.b5 = Button(self.topleft_imex_frame,background='#443344', foreground='white', width=20, relief='solid', bd=1,
                 wraplength=150)
         self.b5['text'] = "Remove image from hyperedge"
         self.b5.bind('<Button-3>',showbucket_text)        
         self.b5['command'] = self.remove_selected_image_from_hyperedge
-        self.b5.place(x=400,y=150)
+        self.b5.pack()
 
-        self.addimgbutton = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.addimgbutton = Button(self.topleft_imex_frame,background='#443344',foreground='white',width='20',relief='solid',bd=1)
         self.addimgbutton['text'] ="Add image to hyperedge"
         self.addimgbutton.bind('<Button-3>',showbucket_text)        
         self.addimgbutton['command'] = self.add_selected_image_to_hyperedge
-        self.addimgbutton.place(x=400,y=195)
+        self.addimgbutton.pack()
+
+        ###################################
+        ###   topmiddleleft_imex_frame  ###
+        ###################################
+
+        self.search_var = StringVar()
+        self.search_var.trace_add("write", self.update_the_list)
+        
+        self.filter_cats_label = Label(self.topmiddleleft_imex_frame,width=20,background='#555555',foreground='white',relief='flat',justify=LEFT, anchor='w')
+        self.filter_cats_label['text'] = 'Search hyperedge'
+        self.filter_cats_label.pack()
+        self.filter_entry = Entry(self.topmiddleleft_imex_frame,background='#777777',foreground = 'white', textvariable=self.search_var, width=30)
+        self.filter_entry.pack()
+
+        boxscrollbar = Scrollbar(self.topmiddleleft_imex_frame,width = 10)
+        #listbox containing the names of the buckets
+        self.categories = Listbox(self.topmiddleleft_imex_frame,width=30,background='#777777',foreground='white',yscrollcommand=boxscrollbar.set,exportselection=0)
+        # self.categories['listvariable'] = valores
+        self.categories['selectmode'] = 'extended'               
+        self.categories.pack()
+        #place of the scrollbar
+        boxscrollbar.config(command=self.categories.yview)
+        boxscrollbar.place(in_=self.categories,relx=1.0, relheight=1)
+        self.categories.bind('<Button-1>', self.deselect_list )
+        self.categories.bind("<Double-Button-1>", self.double_click_bucket)
+        #filter the self.categories listbox
+
+        ###################################
+        ###  topmiddleright_imex_frame  ###
+        ###################################
+
+
+        # Button to add selected hyperedges to chosen_edges
+        self.add_button = Button(
+            self.topmiddleright_imex_frame,
+            text="Add >",
+            command=self.add_to_chosen_edges
+        )
+        self.add_button.pack()
+
+        # Button to remove selected hyperedges from chosen_edges
+        self.remove_button = Button(
+            self.topmiddleright_imex_frame,
+            text="< Remove",
+            command=self.remove_from_chosen_edges
+        )
+        self.remove_button.pack()
+
+        ###################################
+        ###     topright_imex_frame     ###
+        ###################################
 
         #button to show currently selected bucket
-        self.button_overview = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
+        self.button_overview = Button(self.topright_imex_frame,background='#443344',foreground='white',width='20',relief='solid',bd=1)
         self.button_overview['text'] ="Create hypergraph overview"
         self.button_overview.bind('<Button-3>',showbucket_text)        
         self.button_overview['command'] = self.create_overview
-        self.button_overview.place(x=800,y=20)
+        self.button_overview.pack()
+
+        self.chosen_edges = Listbox(
+        self.topright_imex_frame,  # or whichever parent
+        width=30,
+        background='#777777',
+        foreground='white',
+        selectmode='extended',
+        exportselection=False
+    )
+        self.chosen_edges.pack()
+
+
+        # Radio buttons for exclude/include
+        self.filter_mode = StringVar(self.topright_imex_frame,value="exclude")  # default
+
+        self.exclude_rb = Radiobutton(
+            self.topright_imex_frame,
+            text="Exclude",
+            variable=self.filter_mode,
+            value="exclude",
+            command=self.apply_filter
+        )
+        self.exclude_rb.pack(side='left')
+
+        self.include_rb = Radiobutton(
+            self.topright_imex_frame,
+            text="Include",
+            variable=self.filter_mode,
+            value="include",
+            command=self.apply_filter
+        )
+        self.include_rb.pack(side='left')
+
+
+        
+               
+        # #button to show or hide images in the Non-relevant bucket
+        # vv = IntVar()
+        # self.nonR = ttk.Checkbutton(self.top_imex_frame,variable = vv)
+        # self.nonR['text'] ="Check to hide Non-relevant images from displayed results"
+        # self.nonR.bind('<Button-3>',nonrelevant_text)        
+        # self.nonR.var = vv
+        # self.nonR.place(x=400,y=220)
+        
+        # #button to show or hide images already in a bucket
+        # ww = IntVar()
+        # self.inbucket = ttk.Checkbutton(self.top_imex_frame,variable = ww)
+        # self.inbucket['text'] ="Check to hide images already in a bucket"
+        # self.inbucket.bind('<Button-3>',inbucket_text)        
+        # self.inbucket.var = ww
+        # self.inbucket.place(x=400,y=240)
+
+        #enter number of images shown
+        # self.e1 = Entry(self.top_imex_frame,background='#777777',foreground = 'white',exportselection=0,width=24)
+        # self.e1.insert(END, 800) #800 is default, change if needed. 
+        # self.e1.bind('<Button-3>',numim_text)        
+        # self.e1.place(x=200,y=250)
+        # self.var = IntVar()
+        # self.var.set(0)
+
+
+        #button to show currently selected bucket
+
+
+
 
         ### window for matrix view
         self.matrixWindow = Toplevel(self.master)
@@ -444,108 +568,32 @@ class Application(Frame,object):
         #create dataframe for the bucket
         self.theBuckets = {}
         #list of available category buckets
-        valores = StringVar()
-        valores.set("RelevantItems Non-RelevantItems")
-        self.theBuckets["RelevantItems"] = []
-        self.theBuckets["Non-RelevantItems"] = []
+        # valores = StringVar()
+        # valores.set("RelevantItems Non-RelevantItems")
+        # self.theBuckets["RelevantItems"] = []
+        # self.theBuckets["Non-RelevantItems"] = []
         #scrollbar for the buckets
-        boxscrollbar = Scrollbar(width = 10)
-        #listbox containing the names of the buckets
-        self.categories = Listbox(width=30,background='#777777',foreground='white',yscrollcommand=boxscrollbar.set,exportselection=0)
-        self.categories['listvariable'] = valores
-        self.categories['selectmode'] = 'extended'               
-        self.categories.place(x=555,y=50)    
-        #place of the scrollbar
-        boxscrollbar.config(command=self.categories.yview)
-        boxscrollbar.place(in_=self.categories,relx=1.0, relheight=1)
-        self.categories.bind('<Button-1>', self.deselect_list )
-        self.categories.bind("<Double-Button-1>", self.double_click_bucket)
-        #filter the self.categories listbox
-        self.search_var = StringVar()
-        self.search_var.trace_add("write", self.update_the_list)
-        self.filter_entry = Entry(background='#777777',foreground = 'white', textvariable=self.search_var, width=30)
-        self.filter_entry.place(x=555,y=30)
-        self.filter_cats_label = Label(width=20,background='#555555',foreground='white',relief='flat',justify=LEFT, anchor='w')
-        self.filter_cats_label['text'] = 'Filter the buckets'
-        self.filter_cats_label.place(x=555,y=10)
         
 #        #entryform to change name of a bucket
 #        self.changename = Entry(background='#777777',foreground = 'white', width=30)
 #        self.changename.place(x=0, y=0)
-        #button to change name of a bucket
-        self.changebutton = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
-        self.changebutton['text'] = "Rename hyperedge"
-        self.changebutton['command'] = self.rename_hyperedge
-        self.changebutton.bind('<Button-3>',changename_text)
-        self.changebutton.place(x=400, y=20)
         
-        self.add_he_button = Button(background='#443344',foreground='white',width='20',relief='solid',bd=1)
-        self.add_he_button['text'] = "Add hyperedge"
-        self.add_he_button['command'] = self.add_hyperedge
-        self.add_he_button.bind('<Button-3>',changename_text)
-        self.add_he_button.place(x=400, y=80)
 
 
-        self.chosen_edges = Listbox(
-        self.master,  # or whichever parent
-        width=30,
-        background='#777777',
-        foreground='white',
-        selectmode='extended',
-        exportselection=False
-    )
-        self.chosen_edges.place(x=810, y=50)  # adjust geometry as needed
-
-        # Button to add selected hyperedges to chosen_edges
-        self.add_button = Button(
-            self.master,
-            text="Add >",
-            command=self.add_to_chosen_edges
-        )
-        self.add_button.place(x=750, y=50)
-
-        # Button to remove selected hyperedges from chosen_edges
-        self.remove_button = Button(
-            self.master,
-            text="< Remove",
-            command=self.remove_from_chosen_edges
-        )
-        self.remove_button.place(x=750, y=80)
-
-        # Radio buttons for exclude/include
-        self.filter_mode = StringVar(value="exclude")  # default
-
-        self.exclude_rb = Radiobutton(
-            self.master,
-            text="Exclude",
-            variable=self.filter_mode,
-            value="exclude",
-            command=self.apply_filter
-        )
-        self.exclude_rb.place(x=810, y=220)
-
-        self.include_rb = Radiobutton(
-            self.master,
-            text="Include",
-            variable=self.filter_mode,
-            value="include",
-            command=self.apply_filter
-        )
-        self.include_rb.place(x=900, y=220)
             
         #enter the size of the images displayed. 100 is default
         self.imsize = 100
-        self.imsize_entry = Entry(background='#777777',foreground = 'white',exportselection=0)
-        self.imsize_entry.insert(END, 100)
-        self.imsize_entry.place(x=1360,y=270)
-        self.imsize_entry['validate'] = 'focusout'
-        self.imsize_entry['validatecommand'] = self.get_imsize     
+        # self.imsize_entry = Entry(background='#777777',foreground = 'white',exportselection=0)
+        # self.imsize_entry.insert(END, 100)
+        # self.imsize_entry.place(x=1360,y=270)
+        # self.imsize_entry['validate'] = 'focusout'
+        # self.imsize_entry['validatecommand'] = self.get_imsize     
         
-        self.set_imsize_label = Label(background='#555555',foreground='white')
-        self.set_imsize_label['text'] = 'Set the image display\n size in pixels'
-        self.set_imsize_label['wraplength'] = 200
-        self.set_imsize_label['justify'] = CENTER
-        self.set_imsize_label.place(x=1360,y=230)
+        # self.set_imsize_label = Label(background='#555555',foreground='white')
+        # self.set_imsize_label['text'] = 'Set the image display\n size in pixels'
+        # self.set_imsize_label['wraplength'] = 200
+        # self.set_imsize_label['justify'] = CENTER
+        # self.set_imsize_label.place(x=1360,y=230)
                
         #canvas for the images, which adjusts to screen width. Optimized for windows. For sidebar, like in linux, you may want to decrease screen width
         self.screen_width = root.winfo_screenwidth() #requests screen width
@@ -558,23 +606,33 @@ class Application(Frame,object):
         #xscrollbar = Scrollbar(orient="horizontal") #scroll  bar for canvas
         
         #self.c = Canvas(bg='#666666',bd=0, scrollregion=(0, 0, 0, 500), yscrollcommand=yscrollbar.set,xscrollcommand=xscrollbar.set, width =self.screen_width, height =self.screen_height) #canvas size
-        self.c = Canvas(bg='#666666',bd=0, scrollregion=(0, 0, 0, 500), width =self.screen_width, height =self.screen_height) #canvas size
-        yscrollbar = Scrollbar(orient="vertical", command=self.c.yview)
-        xscrollbar = Scrollbar(orient="horizontal", command=self.c.xview)        
-        self.c.my_tag = 'c'
+        # self.c = Canvas(self.bottom_imex_frame,bg='#666666',bd=0, scrollregion=(0, 0, 0, 500), width =self.screen_width, height =self.screen_height) #canvas size
+        # yscrollbar = Scrollbar(orient="vertical", command=self.c.yview)
+        # xscrollbar = Scrollbar(orient="horizontal", command=self.c.xview)        
+        # self.c.my_tag = 'c'
 
-        # self.c.place(x = 0, y=300)
-        self.c.place(relx=0, y=300, relwidth=1, relheight=1, anchor="nw")
-        #yscrollbar.config(command=self.c.yview)
-        #xscrollbar.config(command=self.c.xview)
+        # # self.c.place(x = 0, y=300)
+        # self.c.place(relx=0, y=300, relwidth=1, relheight=1, anchor="nw")
+        # #yscrollbar.config(command=self.c.yview)
+        # #xscrollbar.config(command=self.c.xview)
         
+        # self.c.configure(yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
+        
+        # #yscrollbar.place(in_=self.c,relx=1.0, relheight=1)
+        # #xscrollbar.place(in_=self.c,relx=1.0, relheight=1)
+        # yscrollbar.place(in_=self.c,relx=1.0,relheight=1)
+        # xscrollbar.place(in_=self.c,rely=1.0,relwidth=1)
+
+        self.c = Canvas(self.bottom_imex_frame, bg="#666666")
+        self.c.pack(side="left", fill="both", expand=True)
+        yscrollbar = Scrollbar(self.bottom_imex_frame, orient="vertical", command=self.c.yview)
+        yscrollbar.pack(side="right", fill="y")
+        xscrollbar = Scrollbar(self.bottom_imex_frame, orient="horizontal", command=self.c.xview)
+        xscrollbar.pack(side="bottom", fill="x")
         self.c.configure(yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
-        
-        #yscrollbar.place(in_=self.c,relx=1.0, relheight=1)
-        #xscrollbar.place(in_=self.c,relx=1.0, relheight=1)
-        yscrollbar.place(in_=self.c,relx=1.0,relheight=1)
-        xscrollbar.place(in_=self.c,rely=1.0,relwidth=1)
-        
+
+
+
         self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance)) #the total number of images that fit from left to right
         self.num_im_col = math.floor(self.screen_height / (self.imsize + self.image_distance)) #the total number of images that fit from top to bottom
         #binds scrollwheel when scrolling with mouse on canvas
@@ -844,23 +902,23 @@ class Application(Frame,object):
 
 
         
-        if self.bucketDisp != 1 and (self.nonR.var.get() == 1 or (self.inbucket.var.get() == 1 and self.oview != 1)):
-            # Initialize the set of elements to be removed
-            t = set()
+        # if self.bucketDisp != 1 and (self.nonR.var.get() == 1 or (self.inbucket.var.get() == 1 and self.oview != 1)):
+        #     # Initialize the set of elements to be removed
+        #     t = set()
         
-            # If nonR is selected, add non-relevant items to the removal set
-            if self.nonR.var.get() == 1:
-                t.update(self.theBuckets['Non-RelevantItems'])
+        #     # If nonR is selected, add non-relevant items to the removal set
+        #     if self.nonR.var.get() == 1:
+        #         t.update(self.theBuckets['Non-RelevantItems'])
         
-            # If inbucket is selected and not in overview mode, add all bucketed items to the removal set
-            if self.inbucket.var.get() == 1 and self.oview != 1:
-                t.update(chain.from_iterable(self.theBuckets.values()))        
-            self.remove_elements(t)
+        #     # If inbucket is selected and not in overview mode, add all bucketed items to the removal set
+        #     if self.inbucket.var.get() == 1 and self.oview != 1:
+        #         t.update(chain.from_iterable(self.theBuckets.values()))        
+        #     self.remove_elements(t)
 
 
                 
 
-        num_im =int(self.e1.get())
+        num_im =1000
         if num_im == 0:
             num_im = len(self.im_list)
         if num_im > 1000:
