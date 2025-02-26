@@ -221,6 +221,21 @@ class Application(Frame,object):
 
         self.bottom_imex_frame = Frame(root,bg="#666666")
         self.bottom_imex_frame.pack(side="top", fill="both", expand=True)
+
+        self.bottom_imex_frame.grid_rowconfigure(0, weight=1)
+        self.bottom_imex_frame.grid_columnconfigure(0, weight=2)  # left 2/3
+        self.bottom_imex_frame.grid_columnconfigure(1, weight=1)  # right 1/3
+        
+        # Place the child frames using grid
+        self.bottomleft_imex_frame = Frame(self.bottom_imex_frame, bg="#666666")
+        self.bottomleft_imex_frame.grid(row=0, column=0, sticky="nsew")
+
+        self.bottomleft_imex_frame.grid_rowconfigure(0, weight=1)
+        self.bottomleft_imex_frame.grid_columnconfigure(0, weight=1)
+
+        self.bottomright_imex_frame = Frame(self.bottom_imex_frame, bg="#666666")
+        self.bottomright_imex_frame.grid(row=0, column=1, sticky="nsew")
+
         # text displaying some useful tips and a welcome message
         # self.communication_label = Message(self.top_imex_frame,font=12)
         # self.communication_label['background'] = '#FFFFFF'
@@ -556,8 +571,8 @@ class Application(Frame,object):
         ### some other stuff ####
         #creates window for statistics and other data
         self.newWindow = Toplevel(self.master)
-        self.left_frame = Frame(self.newWindow, bg="#cccccc", width=300)
-        self.left_frame.pack(side=LEFT, fill=BOTH, expand=TRUE)
+        # self.left_frame = Frame(self.newWindow, bg="#cccccc", width=300)
+        # self.left_frame.pack(side=LEFT, fill=BOTH, expand=TRUE)
         # Right frame for the graph and checkbox
         self.right_frame = Frame(self.newWindow, bg="#dddddd")
         self.right_frame.pack(side=RIGHT, fill=BOTH, expand=TRUE)
@@ -609,7 +624,6 @@ class Application(Frame,object):
         # self.c = Canvas(self.bottom_imex_frame,bg='#666666',bd=0, scrollregion=(0, 0, 0, 500), width =self.screen_width, height =self.screen_height) #canvas size
         # yscrollbar = Scrollbar(orient="vertical", command=self.c.yview)
         # xscrollbar = Scrollbar(orient="horizontal", command=self.c.xview)        
-        # self.c.my_tag = 'c'
 
         # # self.c.place(x = 0, y=300)
         # self.c.place(relx=0, y=300, relwidth=1, relheight=1, anchor="nw")
@@ -623,17 +637,37 @@ class Application(Frame,object):
         # yscrollbar.place(in_=self.c,relx=1.0,relheight=1)
         # xscrollbar.place(in_=self.c,rely=1.0,relwidth=1)
 
-        self.c = Canvas(self.bottom_imex_frame, bg="#666666")
-        self.c.pack(side="left", fill="both", expand=True)
-        yscrollbar = Scrollbar(self.bottom_imex_frame, orient="vertical", command=self.c.yview)
-        yscrollbar.pack(side="right", fill="y")
-        xscrollbar = Scrollbar(self.bottom_imex_frame, orient="horizontal", command=self.c.xview)
-        xscrollbar.pack(side="bottom", fill="x")
+        # self.c = Canvas(self.bottomleft_imex_frame, bg="#666666")
+        # self.c.pack(side="left", fill="both", expand=True)
+        # yscrollbar = Scrollbar(self.bottomleft_imex_frame, orient="vertical", command=self.c.yview)
+        # yscrollbar.pack(side="right", fill="y")
+        # xscrollbar = Scrollbar(self.bottomleft_imex_frame, orient="horizontal", command=self.c.xview)
+        # xscrollbar.pack(side="bottom", fill="x")
+        # self.c.configure(yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
+        # self.c.my_tag = 'c'
+
+        self.c = Canvas(self.bottomleft_imex_frame, bg="#666666")
+        self.c.grid(row=0, column=0, sticky="nsew")
+
+        # Create and position the vertical scrollbar
+        yscrollbar = Scrollbar(self.bottomleft_imex_frame, orient="vertical", command=self.c.yview)
+        yscrollbar.grid(row=0, column=1, sticky="ns")
+
+        # Create and position the horizontal scrollbar
+        xscrollbar = Scrollbar(self.bottomleft_imex_frame, orient="horizontal", command=self.c.xview)
+        xscrollbar.grid(row=1, column=0, sticky="ew")
+
+        # Configure the canvas to use the scrollbars
         self.c.configure(yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
+        self.c.my_tag = 'c'
 
+        def on_canvas_configure(event):
+            canvas_width = event.width
+            self.num_im_row = math.floor(canvas_width / (self.imsize + self.image_distance))
+    
+        self.c.bind("<Configure>", on_canvas_configure)
 
-
-        self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance)) #the total number of images that fit from left to right
+        # self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance)) #the total number of images that fit from left to right
         self.num_im_col = math.floor(self.screen_height / (self.imsize + self.image_distance)) #the total number of images that fit from top to bottom
         #binds scrollwheel when scrolling with mouse on canvas
         self.c.bind('<Enter>', self._bound_to_mousewheel)
@@ -768,10 +802,11 @@ class Application(Frame,object):
         # Traverse up to find the canvas
         while not isinstance(canvas, Canvas):
             canvas = canvas.master
+        
         # Now you can access the canvas and its tags
         self.canvas_tag = getattr(canvas, 'my_tag', None)
         self.item = event.widget.find_overlapping(evex, evey, evex, evey)
-        
+        print('ct',self.canvas_tag,'item',self.item)
         if self.canvas_tag is not None:
             self.c.delete('rect_tag')
             for canv in self.hyperedge_canvases:
@@ -859,141 +894,119 @@ class Application(Frame,object):
     def double_click_bucket(self, event):
         self.showBucket()
 
-    # def remove_elements(self, elements):
-    #     xx = list(self.ccluster)
-    #     self.ccluster = np.array(list(sorted(set(self.ccluster) - set(elements), key=xx.index)))
 
     def remove_elements(self, elements):
         self.ccluster = np.array([x for x in self.ccluster if x not in elements])
-                       
-    #the function that is called by other functions in order to display images
-    def display_images(self, cluster,input_origin=None): #x is the list with the image names, cluster is the list with ids. 
+
+    # def display_images(self, cluster,input_origin=None): #x is the list with the image names, cluster is the list with ids. 
         
+    #     self.c.unbind("<ButtonRelease-1>")
+    #     self.c.unbind("<B1-Motion>")
+    #     # self.c.unbind("<Shift-Button-1>")
+    #     self.c.unbind("<Shift-B1-Motion>")
+    #     self.c.unbind("<Shift-ButtonRelease-1>")
+    #     # self.c.unbind("<Button-1>")
+         
+    #     if len(cluster) == 0:
+    #         self.communication_label.configure(text='No images to show')
+    #         return
+    #     self.ccluster = cluster
+     
+    #     self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance)) #the total number of images that fit from left to right
+
+    #     num_im =1000
+    #     if num_im == 0:
+    #         num_im = len(self.im_list)
+    #     if num_im > 1000:
+    #         num_im = 1000
+    #     if num_im > len(cluster):
+    #         num_im = len(cluster)
+    #     else:
+    #         self.ccluster = self.ccluster[0:num_im]
+    #     x = []
+    #     for ij in range(0,len(self.ccluster)):
+    #         x.append(self.im_list[self.ccluster[ij]])
+    #     self.imagex = []
+    #     self.c['scrollregion'] = (0,0,0,math.ceil(len(x)/self.num_im_row)*(self.imsize+self.image_distance))
+    #     self.c.delete("all")
+            
+        
+    #     try: #### this fixes a memory leak by deleting currently loaded images in the memory.
+    #         for uut in range(0,len(self.my_img)):
+    #             self.my_img[uut].destroy()
+    #     except AttributeError:
+    #         pass
+    #     self.my_img = []
+    #     with h5py.File(self.hdf_path, 'r') as hdf:
+    #         for j in range(0,len(x)):
+
+    #             #load = Image.open(x[j])
+    #             #test = np.asarray(hdf.get('thumbnails')[1],dtype='uint8')
+    #             load = Image.fromarray(np.array(hdf.get('thumbnail_images')[self.ccluster[j]],dtype='uint8'))
+    #             render = ImageTk.PhotoImage(load)
+    #             self.my_img.append(render)
+    #             row_ = j // self.num_im_row
+    #             column_ = j % self.num_im_row
+    #             x_pos = column_ * (self.imsize + self.image_distance) + (self.imsize / 2)
+    #             y_pos = row_ * (self.imsize + self.image_distance) + (self.imsize / 2)
+
+
+    #             self.imagex.append(self.c.create_image(x_pos,y_pos, image=render, tags=self.ccluster[j]))
+
+
+    #the function that is called by other functions in order to display images
+    def display_images(self, cluster, input_origin=None):
         self.c.unbind("<ButtonRelease-1>")
         self.c.unbind("<B1-Motion>")
-        # self.c.unbind("<Shift-Button-1>")
         self.c.unbind("<Shift-B1-Motion>")
         self.c.unbind("<Shift-ButtonRelease-1>")
-        # self.c.unbind("<Button-1>")
-        
-        # try:
-        #     self.seenX = np.max(self.totimseen)
-        #     self.totimseen = []
-        # except AttributeError:
-        #     pass
-        # except ValueError:
-        #     if len(self.ccluster) > self.num_im_row*self.num_im_col:
-        #            self.seenX = self.num_im_row*self.num_im_col
-        #     else:
-        #         self.seenX = len(self.ccluster)
-                
-        if len(cluster) == 0:
-            self.communication_label.configure(text='No images to show')
-            return
-        self.ccluster = cluster
-        # if input_origin == 'overview':
-        #     self.oview = 1
-        #     # self.bO3["state"] = 'normal'
-        # else:
-        #     self.oview = 0
-        #     # self.bO3["state"] = 'disabled'
-       
-        self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance)) #the total number of images that fit from left to right
 
-
-        
-        # if self.bucketDisp != 1 and (self.nonR.var.get() == 1 or (self.inbucket.var.get() == 1 and self.oview != 1)):
-        #     # Initialize the set of elements to be removed
-        #     t = set()
-        
-        #     # If nonR is selected, add non-relevant items to the removal set
-        #     if self.nonR.var.get() == 1:
-        #         t.update(self.theBuckets['Non-RelevantItems'])
-        
-        #     # If inbucket is selected and not in overview mode, add all bucketed items to the removal set
-        #     if self.inbucket.var.get() == 1 and self.oview != 1:
-        #         t.update(chain.from_iterable(self.theBuckets.values()))        
-        #     self.remove_elements(t)
-
-
-                
-
-        num_im =1000
-        if num_im == 0:
-            num_im = len(self.im_list)
-        if num_im > 1000:
-            num_im = 1000
-        if num_im > len(cluster):
-            num_im = len(cluster)
-        else:
-            self.ccluster = self.ccluster[0:num_im]
-        x = []
-        for ij in range(0,len(self.ccluster)):
-            x.append(self.im_list[self.ccluster[ij]])
-        self.imagex = []
-        self.c['scrollregion'] = (0,0,0,math.ceil(len(x)/self.num_im_row)*(self.imsize+self.image_distance))
+        num_im = min(1000, len(cluster))
+        self.ccluster = cluster[:num_im]
+        # # self.num_im_row = math.floor(self.screen_width / (self.imsize + self.image_distance))
+        # images_to_load = [self.im_list[c] for c in self.ccluster]
+        # num_rows = math.ceil(len(images_to_load) / self.num_im_row)
         self.c.delete("all")
-        # self.greentangles = []
-        # self.purpletangles = []
-        # if self.bucketDisp == 5:
-        #     self.bucketDisp == 0
 
-            
-        
-        try: #### this fixes a memory leak by deleting currently loaded images in the memory.
-            for uut in range(0,len(self.my_img)):
-                self.my_img[uut].destroy()
-        except AttributeError:
-            pass
-        self.my_img = []
+        # Drop references to old PhotoImages so they can be GC'd
+        if hasattr(self, 'my_img'):
+            self.my_img.clear()
+        else:
+            self.my_img = []
+
+        if hasattr(self, 'imagex'):
+            self.imagex.clear()
+        else:
+            self.imagex = []
+
+        # Calculate scroll region
+        num_rows = math.ceil(len(self.ccluster) / self.num_im_row)
+
+
+        self.c['scrollregion'] = (0, 0, 0, num_rows * (self.imsize + self.image_distance))
+        # self.c.delete("all")
+
+        # Clean up previously loaded images to prevent memory leaks
+        # # if hasattr(self, 'my_img'):
+        # #     for img in self.my_img:
+        # #         img.destroy()
+        # self.my_img = []
+        # self.imagex = []
+        # Open the HDF5 file and load images into the canvas
         with h5py.File(self.hdf_path, 'r') as hdf:
-            for j in range(0,len(x)):
-
-                #load = Image.open(x[j])
-                #test = np.asarray(hdf.get('thumbnails')[1],dtype='uint8')
-                load = Image.fromarray(np.array(hdf.get('thumbnail_images')[self.ccluster[j]],dtype='uint8'))
+            for j, img_id in enumerate(self.ccluster):
+                img_array = np.array(hdf.get('thumbnail_images')[img_id], dtype='uint8')
+                load = Image.fromarray(img_array)
                 render = ImageTk.PhotoImage(load)
                 self.my_img.append(render)
+
                 row_ = j // self.num_im_row
-                column_ = j % self.num_im_row
-                x_pos = column_ * (self.imsize + self.image_distance) + (self.imsize / 2)
+                col_ = j % self.num_im_row
+                x_pos = col_ * (self.imsize + self.image_distance) + (self.imsize / 2)
                 y_pos = row_ * (self.imsize + self.image_distance) + (self.imsize / 2)
-
-
-                # self.my_img.append([])
-                # self.my_img[j] = Label(self.c,background='#555555')
-                # self.my_img[j].image = render
-                # row_ = math.floor(j/self.num_im_row)
-                # column_ = j%self.num_im_row
-                self.imagex.append(self.c.create_image(x_pos,y_pos, image=render, tags=self.ccluster[j]))
+                self.imagex.append(self.c.create_image(x_pos, y_pos, image=render, tags=img_id))
+                    
                 
-                
-#                self.my_img[j].destroy()
-                # if self.bucketDisp != 1:
-                #     if int(self.ccluster[j]) in [xx for vv in self.theBuckets.values() for xx in vv]:
-                #             self.greentangles.append(self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='cyan2',width=self.rectanglewidth,tags = self.ccluster[j]))                    
-                # if self.subcyes == 1:
-                #     if int(self.ccluster[j]) in self.sel_im:
-                #         self.purpletangles.append(self.c.create_rectangle(column_*(self.imsize + self.image_distance), row_*(self.imsize + self.image_distance), column_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, row_*(self.imsize + self.image_distance)+(self.imsize + self.image_distance)-self.image_distance, outline='blueviolet',width=self.rectanglewidth,tags = self.ccluster[j]))
-                # if self.oview == 1:
-                #     txtov = self.c.create_text(column_*(self.imsize + self.image_distance)+ (self.imsize / 2),row_*(self.imsize + self.image_distance)+ self.imsize - (self.image_distance/2) ,anchor='nw',fill="white",font="Calibri 8",
-                #                        text=str(len(np.where(self.df[:,j]>-1)[0])))
-                #     txtbb = self.c.create_rectangle(self.c.bbox(txtov),fill="#666666",outline="");self.c.tag_lower(txtbb,txtov)
-                # self.c.update()
-            # self.row_ = row_
-            # self.column_ = column_
-            
-        #     if self.ctrlzused == 1: 
-        #         self.ctrlzused = 0
-        #     else:
-        #         self.czcurrent = -1
-
-        #         if len(self.controlZ) < 10:                
-        #             self.controlZ.append(cluster)
-        #         else:
-        #             del self.controlZ[0]
-        #             self.controlZ.append(cluster)                    
-        # self.subcyes = 0
         
     def _on_mousewheel(self, event):
         self.c.yview_scroll((int(-1*event.delta/120)), "units")
@@ -1283,11 +1296,19 @@ class Application(Frame,object):
         # Get the current visible area
         xlim = self.ax.get_xlim()
         ylim = self.ax.get_ylim()
+        
+        if not hasattr(self, 'previous_xlim'):
+            self.previous_xlim = xlim
+            self.previous_ylim = ylim
         # Determine if this is a zoom-out by comparing with previous limits
+        current_width = xlim[1] - xlim[0]
+        previous_width = self.previous_xlim[1] - self.previous_xlim[0]
+        current_height = ylim[1] - ylim[0]
+        previous_height = self.previous_ylim[1] - self.previous_ylim[0]
+
         zoom_out = (
             hasattr(self, 'previous_xlim') and
-            (xlim[0] < self.previous_xlim[0] or xlim[1] > self.previous_xlim[1] or
-            ylim[0] < self.previous_ylim[0] or ylim[1] > self.previous_ylim[1])
+            (current_width > previous_width or current_height > previous_height)
         )
 
 
@@ -1619,14 +1640,14 @@ class Application(Frame,object):
             return
 
         # Ensure UI geometry is up-to-date
-        self.left_frame.update_idletasks()
+        self.bottomleft_imex_frame.update_idletasks()
         self.main_canvas.update_idletasks()
 
         # Scroll the main canvas to show the target hyperedge
         # Each hyperedge_canvas is appended in order to self.hyperedge_canvases
         target_canvas = self.hyperedge_canvases[target_index]
         target_frame = self.hyperedge_frames[target_index] 
-        self.left_frame.update_idletasks()
+        self.bottomleft_imex_frame.update_idletasks()
         self.main_canvas.update_idletasks()
         # Get the y-coordinate of this canvas relative to the frame
         y_coord = target_frame.winfo_y()
@@ -1753,7 +1774,7 @@ class Application(Frame,object):
         self.ax.set_xlim(x_min, x_max)
         self.ax.set_ylim(y_min, y_max)
         self.canvasG.draw_idle()
-        self.left_frame.update_idletasks()
+        self.bottomleft_imex_frame.update_idletasks()
         self.main_canvas.update_idletasks()
 
         # Now, determine which points are visible in this new view:
@@ -4029,7 +4050,7 @@ class Application(Frame,object):
 
     def display_overlapping_hyperedges(self):
         # Destroy existing widgets in the new window
-        for widget in self.left_frame.winfo_children():
+        for widget in self.bottomright_imex_frame.winfo_children():
             if (hasattr(self, 'canvasG') and widget == self.canvasG.get_tk_widget()) or \
                     (hasattr(self, 'linked') and widget == self.linked):
                 # Skip destroying self.canvasG or self.linked if they exist
@@ -4040,10 +4061,10 @@ class Application(Frame,object):
         self.hyperedge_canvases.clear()
         
         # Create a main canvas and scrollbar in the new window
-        self.main_canvas = Canvas(self.left_frame, bg='#555555')
+        self.main_canvas = Canvas(self.bottomright_imex_frame, bg='#555555')
         self.main_canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
         
-        scrollbar = Scrollbar(self.left_frame, orient=VERTICAL, command=self.main_canvas.yview)
+        scrollbar = Scrollbar(self.bottomright_imex_frame, orient=VERTICAL, command=self.main_canvas.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         
         self.main_canvas.configure(yscrollcommand=scrollbar.set)
